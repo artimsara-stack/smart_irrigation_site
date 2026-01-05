@@ -1,6 +1,7 @@
-// app.js — reads Firebase RTDB via REST and updates the dashboard
+// app.js — Smart Irrigation Dashboard (REST from Firebase RTDB)
 
-const DB_URL = "https://smart-irrigation-site-90e51-default-rtdb.firebaseio.com/last.json";
+const DB_URL =
+  "https://smart-irrigation-site-90e51-default-rtdb.firebaseio.com/last.json";
 
 // UI elements (IDs from your HTML)
 const el = {
@@ -15,28 +16,37 @@ const el = {
   lastUpdate: document.getElementById("lastUpdate"),
 };
 
-// Simple helpers
+// ---------- Helpers ----------
 function setText(node, value) {
   if (!node) return;
-  node.textContent = (value === undefined || value === null) ? "--" : value;
+  node.textContent =
+    value === undefined || value === null || value === "" ? "--" : String(value);
+}
+
+// format numbers safely (prevents flicker / errors)
+function fmtNumber(v, digits = 1) {
+  if (typeof v !== "number" || Number.isNaN(v)) return "--";
+  return v.toFixed(digits);
 }
 
 function setConnected(ok, msg) {
-  if (el.connDot) el.connDot.style.background = ok ? "#22c55e" : "#ef4444"; // green/red
+  if (el.connDot) el.connDot.style.background = ok ? "#22c55e" : "#ef4444";
   setText(el.connText, msg);
 }
 
-// Charts (Chart.js already loaded in HTML)
-let tempChart, soilChart;
-const tempData = { labels: [], values: [] };
-const soilData = { labels: [], values: [] };
+// ---------- Charts ----------
+let tempChart = null;
+let soilChart = null;
 
-function pushPoint(store, label, value, maxPoints = 30) {
-  store.labels.push(label);
-  store.values.push(value);
-  if (store.labels.length > maxPoints) {
-    store.labels.shift();
-    store.values.shift();
+const tempSeries = { labels: [], values: [] };
+const soilSeries = { labels: [], values: [] };
+
+function pushPoint(series, label, value, maxPoints = 30) {
+  series.labels.push(label);
+  series.values.push(value);
+  while (series.labels.length > maxPoints) {
+    series.labels.shift();
+    series.values.shift();
   }
 }
 
@@ -49,10 +59,10 @@ function ensureCharts() {
       tempChart = new Chart(ctx, {
         type: "line",
         data: {
-          labels: tempData.labels,
-          datasets: [{ label: "Air Temp (°C)", data: tempData.values, tension: 0.3 }]
+          labels: tempSeries.labels,
+          datasets: [{ label: "Air Temp (°C)", data: tempSeries.values, tension: 0.3 }],
         },
-        options: { responsive: true, animation: false, scales: { y: { beginAtZero: false } } }
+        options: { responsive: true, animation: false, scales: { y: { beginAtZero: false } } },
       });
     }
   }
@@ -63,64 +73,70 @@ function ensureCharts() {
       soilChart = new Chart(ctx, {
         type: "line",
         data: {
-          labels: soilData.labels,
-          datasets: [{ label: "Soil (%)", data: soilData.values, tension: 0.3 }]
+          labels: soilSeries.labels,
+          datasets: [{ label: "Soil (%)", data: soilSeries.values, tension: 0.3 }],
         },
-        options: { responsive: true, animation: false, scales: { y: { min: 0, max: 100 } } }
+        options: { responsive: true, animation: false, scales: { y: { min: 0, max: 100 } } },
       });
     }
   }
 }
 
+// ---------- Main fetch loop ----------
 async function loadLast() {
   try {
     const res = await fetch(DB_URL, { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
 
     const d = await res.json();
-    if (!d) throw new Error("No data at /last");
+    if (!d || typeof d !== "object") throw new Error("No data at /last");
 
-    // Format values
-    const airT = (typeof d.air_temp === "number") ? d.air_temp.toFixed(1) : d.air_temp;
-    const rh   = (typeof d.air_rh === "number") ? d.air_rh.toFixed(1) : d.air_rh;
+    // Read values (from your Firebase JSON keys)
+    const air_temp = d.air_temp; // number
+    const air_rh = d.air_rh; // number
+    const soil_pct = d.soil_pct; // number
+    const lux = d.lux; // number
+    const ppfd = d.ppfd; // number
+    const pump = d.pump; // "ON"/"OFF"
+    const crop = d.crop; // "tomate" (optional)
+    const irrig_ms = d.irrig_ms; // optional
+    // period not present in your JSON, so we show crop/irrig_ms instead
 
-    // soil can be "soil_pct" in your JSON
-    const soilPct = (typeof d.soil_pct === "number") ? d.soil_pct.toFixed(1) : d.soil_pct;
+    // Update KPI cards (NO flicker)
+    setText(el.airTemp, fmtNumber(air_temp, 1));
+    setText(el.airRH, fmtNumber(air_rh, 1));
+    setText(el.soil, fmtNumber(soil_pct, 1));
+    setText(el.lux, typeof lux === "number" ? String(Math.round(lux)) : "--");
+    setText(el.ppfd, fmtNumber(ppfd, 2));
 
-    const lux  = (typeof d.lux === "number") ? d.lux.toFixed(0) : d.lux;
-    const ppfd = (typeof d.ppfd === "number") ? d.ppfd.toFixed(2) : d.ppfd;
+    // Pump / Period card (custom display)
+    let pumpLine = pump ?? "--";
+    if (crop) pumpLine += ` • ${crop}`;
+    if (typeof irrig_ms === "number") pumpLine += ` • ${irrig_ms}ms`;
+    setText(el.pumpPeriod, pumpLine);
 
-    // Update KPI cards
-    setText(el.airTemp, airT);
-    setText(el.airRH, rh);
-    setText(el.soil, soilPct);
-    setText(el.lux, lux);
-    setText(el.ppfd, ppfd);
-
-    // Pump / Period card: show pump + crop (or period if you have it later)
-    const pump = d.pump ?? "--";
-    const crop = d.crop ?? "";
-    setText(el.pumpPeriod, crop ? `${pump} • ${crop}` : pump);
-
-    // Update time
+    // Timestamp
     setText(el.lastUpdate, new Date().toLocaleString());
 
     // Charts
     ensureCharts();
-    const tLabel = new Date().toLocaleTimeString();
-    if (typeof d.air_temp === "number") {
-      pushPoint(tempData, tLabel, d.air_temp);
+    const label = new Date().toLocaleTimeString();
+
+    if (typeof air_temp === "number") {
+      pushPoint(tempSeries, label, air_temp);
       tempChart?.update();
     }
-    if (typeof d.soil_pct === "number") {
-      pushPoint(soilData, tLabel, d.soil_pct);
+
+    if (typeof soil_pct === "number") {
+      pushPoint(soilSeries, label, soil_pct);
       soilChart?.update();
     }
 
-    setConnected(true, "Connected ✅");
+    setConnected(true, "Firebase OK ✅");
   } catch (e) {
-    console.error(e);
-    setConnected(false, "Erreur Firebase ❌");
+    console.error("Dashboard error:", e);
+    // IMPORTANT: we do NOT overwrite values with "--" here (prevents flicker)
+    setConnected(false, "Connexion instable…");
   }
 }
 
