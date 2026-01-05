@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Smart Irrigation Dashboard</title>
+
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+  <header class="top">
+    <h1>Smart Irrigation Dashboard</h1>
+    <p class="sub">ESP32 • Firebase • KPI</p>
+  </header>
+
+  <section class="grid">
+    <div class="card"><div class="k">Air Temp (°C)</div><div class="v" id="air_temp">--</div></div>
+    <div class="card"><div class="k">Air RH (%)</div><div class="v" id="air_rh">--</div></div>
+    <div class="card"><div class="k">Soil (%)</div><div class="v" id="soil">--</div></div>
+    <div class="card"><div class="k">Lux</div><div class="v" id="lux">--</div></div>
+    <div class="card"><div class="k">PPFD</div><div class="v" id="ppfd">--</div></div>
+    <div class="card"><div class="k">Pump / Period</div><div class="v" id="pump_period">--</div></div>
+  </section>
+
+  <section class="charts">
+    <div class="chartCard">
+      <h2>Air Temperature</h2>
+      <canvas id="chartTemp"></canvas>
+    </div>
+
+    <div class="chartCard">
+      <h2>Soil Moisture</h2>
+      <canvas id="chartSoil"></canvas>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span id="status">Status: --</span>
+    <span id="updated">Updated: --</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
