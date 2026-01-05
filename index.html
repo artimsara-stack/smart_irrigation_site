@@ -2,44 +2,80 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Smart Irrigation Dashboard</title>
-
   <link rel="stylesheet" href="style.css" />
+
+  <!-- Charts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
-  <header class="top">
-    <h1>Smart Irrigation Dashboard</h1>
-    <p class="sub">ESP32 • Firebase • KPI</p>
+  <header class="topbar">
+    <div class="title">
+      <span class="logo">🌱</span>
+      <div>
+        <h1>Smart Irrigation Dashboard</h1>
+        <p class="subtitle">ESP32 • Firebase • KPI</p>
+      </div>
+    </div>
+    <div class="status">
+      <span id="connDot" class="dot"></span>
+      <span id="connText">Connexion…</span>
+    </div>
   </header>
 
-  <section class="grid">
-    <div class="card"><div class="k">Air Temp (°C)</div><div class="v" id="air_temp">--</div></div>
-    <div class="card"><div class="k">Air RH (%)</div><div class="v" id="air_rh">--</div></div>
-    <div class="card"><div class="k">Soil (%)</div><div class="v" id="soil">--</div></div>
-    <div class="card"><div class="k">Lux</div><div class="v" id="lux">--</div></div>
-    <div class="card"><div class="k">PPFD</div><div class="v" id="ppfd">--</div></div>
-    <div class="card"><div class="k">Pump / Period</div><div class="v" id="pump_period">--</div></div>
-  </section>
+  <main class="container">
+    <!-- KPI Cards -->
+    <section class="cards">
+      <div class="card">
+        <div class="label">Air Temp (°C)</div>
+        <div class="value" id="airTemp">--</div>
+      </div>
 
-  <section class="charts">
-    <div class="chartCard">
-      <h2>Air Temperature</h2>
-      <canvas id="chartTemp"></canvas>
-    </div>
+      <div class="card">
+        <div class="label">Air RH (%)</div>
+        <div class="value" id="airRH">--</div>
+      </div>
 
-    <div class="chartCard">
-      <h2>Soil Moisture</h2>
-      <canvas id="chartSoil"></canvas>
-    </div>
-  </section>
+      <div class="card">
+        <div class="label">Soil (%)</div>
+        <div class="value" id="soil">--</div>
+      </div>
 
-  <footer class="foot">
-    <span id="status">Status: --</span>
-    <span id="updated">Updated: --</span>
-  </footer>
+      <div class="card">
+        <div class="label">Lux</div>
+        <div class="value" id="lux">--</div>
+      </div>
+
+      <div class="card">
+        <div class="label">PPFD</div>
+        <div class="value" id="ppfd">--</div>
+      </div>
+
+      <div class="card">
+        <div class="label">Pump / Period</div>
+        <div class="value" id="pumpPeriod">--</div>
+      </div>
+    </section>
+
+    <!-- Charts -->
+    <section class="charts">
+      <div class="panel">
+        <div class="panelTitle">Air Temperature</div>
+        <canvas id="tempChart"></canvas>
+      </div>
+
+      <div class="panel">
+        <div class="panelTitle">Soil Moisture</div>
+        <canvas id="soilChart"></canvas>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>Dernière mise à jour: </span><span id="lastUpdate">--</span>
+    </footer>
+  </main>
 
   <script src="app.js"></script>
 </body>
