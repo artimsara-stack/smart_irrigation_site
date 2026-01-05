@@ -1,25 +1,45 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="fr">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Smart Irrigation Dashboard</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="./style.css" />
 
-  <!-- Firebase SDK -->
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Firebase (compat) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
-
 <body>
-  <h1>🌱 Smart Irrigation Dashboard</h1>
+  <header>
+    <h1>Smart Irrigation — Dashboard</h1>
+    <p id="status">Connexion…</p>
+  </header>
 
-  <div class="card">Air Temp: <span id="air_temp">--</span> °C</div>
-  <div class="card">Air RH: <span id="air_rh">--</span> %</div>
-  <div class="card">Soil: <span id="soil">--</span> %</div>
-  <div class="card">Lux: <span id="lux">--</span></div>
-  <div class="card">PPFD: <span id="ppfd">--</span></div>
-  <div class="card">Pump: <span id="pump">--</span></div>
+  <section class="cards">
+    <div class="card"><div class="k">Air Temp (°C)</div><div class="v" id="air_temp">--</div></div>
+    <div class="card"><div class="k">Air RH (%)</div><div class="v" id="air_rh">--</div></div>
+    <div class="card"><div class="k">Soil (%)</div><div class="v" id="soil">--</div></div>
+    <div class="card"><div class="k">Lux</div><div class="v" id="lux">--</div></div>
+    <div class="card"><div class="k">PPFD</div><div class="v" id="ppfd">--</div></div>
+    <div class="card"><div class="k">BMP Temp (°C)</div><div class="v" id="bmp_temp">--</div></div>
+    <div class="card"><div class="k">Pressure (hPa)</div><div class="v" id="pressure_hpa">--</div></div>
+    <div class="card"><div class="k">Pump</div><div class="v" id="pump">--</div></div>
+    <div class="card"><div class="k">Period</div><div class="v" id="period">--</div></div>
+  </section>
 
-  <script src="app.js"></script>
+  <section class="chartbox">
+    <h2>Historique (Soil / Temp / RH)</h2>
+    <canvas id="chart"></canvas>
+  </section>
+
+  <footer>
+    <small>© PFE — Smart Irrigation</small>
+  </footer>
+
+  <script src="./app.js"></script>
 </body>
 </html>
