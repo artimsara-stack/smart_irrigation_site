@@ -1,45 +1,24 @@
-<!doctype html>
-<html lang="fr">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8" />
   <title>Smart Irrigation Dashboard</title>
+  <link rel="stylesheet" href="style.css">
 
-  <link rel="stylesheet" href="style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 
 <body>
-  <header class="top">
-    <h1>Smart Irrigation Dashboard</h1>
-    <p class="sub">ESP32 • Firebase • KPI</p>
-  </header>
+  <h1>🌱 Smart Irrigation Dashboard</h1>
 
-  <section class="grid">
-    <div class="card"><div class="k">Air Temp (°C)</div><div class="v" id="air_temp">--</div></div>
-    <div class="card"><div class="k">Air RH (%)</div><div class="v" id="air_rh">--</div></div>
-    <div class="card"><div class="k">Soil (%)</div><div class="v" id="soil">--</div></div>
-    <div class="card"><div class="k">Lux</div><div class="v" id="lux">--</div></div>
-    <div class="card"><div class="k">PPFD</div><div class="v" id="ppfd">--</div></div>
-    <div class="card"><div class="k">Pump / Period</div><div class="v" id="pump_period">--</div></div>
-  </section>
-
-  <section class="charts">
-    <div class="chartCard">
-      <h2>Air Temperature</h2>
-      <canvas id="chartTemp"></canvas>
-    </div>
-
-    <div class="chartCard">
-      <h2>Soil Moisture</h2>
-      <canvas id="chartSoil"></canvas>
-    </div>
-  </section>
-
-  <footer class="foot">
-    <span id="status">Status: --</span>
-    <span id="updated">Updated: --</span>
-  </footer>
+  <div class="card">Air Temp: <span id="air_temp">--</span> °C</div>
+  <div class="card">Air RH: <span id="air_rh">--</span> %</div>
+  <div class="card">Soil: <span id="soil">--</span> %</div>
+  <div class="card">Lux: <span id="lux">--</span></div>
+  <div class="card">PPFD: <span id="ppfd">--</span></div>
+  <div class="card">Pump: <span id="pump">--</span></div>
 
   <script src="app.js"></script>
 </body>
