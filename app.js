@@ -1,5 +1,6 @@
 // ================== Firebase Realtime Database ==================
-const DB_URL = "https://smart-irrigation-site-90e51-default-rtdb.firebaseio.com";
+const DB_URL = "https://smart-irrigation-site-90e51-default-rtdb.firebaseio.com/.json
+";
 
 // DOM helpers
 const $ = (id) => document.getElementById(id);
