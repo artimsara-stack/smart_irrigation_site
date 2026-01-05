@@ -1,177 +1,130 @@
-/*************************************************
- *  Smart Irrigation Dashboard (Firebase RTDB)
- *  - Reads values from Realtime Database via REST
- *  - Updates KPI cards + 2 charts
- *************************************************/
+// app.js — reads Firebase RTDB via REST and updates the dashboard
 
-// ✅ 1) PUT YOUR FIREBASE BASE URL HERE (NO .json at end)
-const FIREBASE_BASE = "https://smart-irrigation-site-90e51-default-rtdb.firebaseio.com";
+const DB_URL = "https://smart-irrigation-site-90e51-default-rtdb.firebaseio.com/last.json";
 
-// ✅ 2) PATH WHERE YOUR DATA IS STORED
-// From your screenshot, you have air_temp at root => "/"
-const DATA_PATH = "/";           // root
-// If later you store into "/latest", set: const DATA_PATH = "/latest";
+// UI elements (IDs from your HTML)
+const el = {
+  connDot: document.getElementById("connDot"),
+  connText: document.getElementById("connText"),
+  airTemp: document.getElementById("airTemp"),
+  airRH: document.getElementById("airRH"),
+  soil: document.getElementById("soil"),
+  lux: document.getElementById("lux"),
+  ppfd: document.getElementById("ppfd"),
+  pumpPeriod: document.getElementById("pumpPeriod"),
+  lastUpdate: document.getElementById("lastUpdate"),
+};
 
-const POLL_MS = 2000;
+// Simple helpers
+function setText(node, value) {
+  if (!node) return;
+  node.textContent = (value === undefined || value === null) ? "--" : value;
+}
 
-// ---------- DOM ----------
-const el = (id) => document.getElementById(id);
+function setConnected(ok, msg) {
+  if (el.connDot) el.connDot.style.background = ok ? "#22c55e" : "#ef4444"; // green/red
+  setText(el.connText, msg);
+}
 
-const airTempEl = el("airTemp");
-const airRHEl   = el("airRH");
-const soilEl    = el("soil");
-const luxEl     = el("lux");
-const ppfdEl    = el("ppfd");
-const pumpPerEl = el("pumpPeriod");
+// Charts (Chart.js already loaded in HTML)
+let tempChart, soilChart;
+const tempData = { labels: [], values: [] };
+const soilData = { labels: [], values: [] };
 
-const connDot  = el("connDot");
-const connText = el("connText");
-const lastUpEl = el("lastUpdate");
+function pushPoint(store, label, value, maxPoints = 30) {
+  store.labels.push(label);
+  store.values.push(value);
+  if (store.labels.length > maxPoints) {
+    store.labels.shift();
+    store.values.shift();
+  }
+}
 
-// ---------- Charts ----------
-const makeChart = (ctx, label) => new Chart(ctx, {
-  type: "line",
-  data: {
-    labels: [],
-    datasets: [{
-      label,
-      data: [],
-      tension: 0.25,
-      pointRadius: 0,
-      borderWidth: 2
-    }]
-  },
-  options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      x: { ticks: { maxTicksLimit: 6 } },
-      y: { beginAtZero: true }
+function ensureCharts() {
+  if (!window.Chart) return;
+
+  if (!tempChart) {
+    const ctx = document.getElementById("tempChart")?.getContext("2d");
+    if (ctx) {
+      tempChart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: tempData.labels,
+          datasets: [{ label: "Air Temp (°C)", data: tempData.values, tension: 0.3 }]
+        },
+        options: { responsive: true, animation: false, scales: { y: { beginAtZero: false } } }
+      });
     }
   }
-});
 
-const tempChart = makeChart(document.getElementById("tempChart"), "Air Temp (°C)");
-const soilChart = makeChart(document.getElementById("soilChart"), "Soil (%)");
-
-// Fix canvas height (so charts show well)
-document.getElementById("tempChart").parentElement.style.height = "320px";
-document.getElementById("soilChart").parentElement.style.height = "320px";
-
-function setConn(ok, msg){
-  connDot.classList.remove("ok","bad");
-  connDot.classList.add(ok ? "ok" : "bad");
-  connText.textContent = msg;
-}
-
-function fmt(v, digits=1){
-  if (v === undefined || v === null || Number.isNaN(v)) return "--";
-  return Number(v).toFixed(digits);
-}
-
-function pushPoint(chart, value){
-  const now = new Date();
-  const t = now.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
-
-  chart.data.labels.push(t);
-  chart.data.datasets[0].data.push(value);
-
-  // keep last 30 points
-  if (chart.data.labels.length > 30){
-    chart.data.labels.shift();
-    chart.data.datasets[0].data.shift();
-  }
-  chart.update();
-}
-
-// ---------- Firebase REST fetch ----------
-async function fetchData(){
-  // Build URL: base + path + ".json"
-  // Ensure no double slashes
-  const base = FIREBASE_BASE.replace(/\/+$/,"");
-  const path = DATA_PATH.startsWith("/") ? DATA_PATH : "/" + DATA_PATH;
-  const url = `${base}${path}.json`;
-
-  const r = await fetch(url, { cache: "no-store" });
-  if (!r.ok) throw new Error("HTTP " + r.status);
-  return await r.json();
-}
-
-function applyData(d){
-  // d is object from RTDB
-  // expected keys: air_temp, air_rh, soil, lux, ppfd, pump, period
-
-  const tAir  = d?.air_temp;
-  const rh    = d?.air_rh;
-  const soil  = d?.soil;
-  const lux   = d?.lux;
-  const ppfd  = d?.ppfd;
-  const pump  = d?.pump;
-  const period= d?.period;
-
-  airTempEl.textContent = (tAir==null) ? "--" : `${fmt(tAir,1)} °C`;
-  airRHEl.textContent   = (rh==null)   ? "--" : `${fmt(rh,0)} %`;
-  soilEl.textContent    = (soil==null) ? "--" : `${fmt(soil,0)} %`;
-  luxEl.textContent     = (lux==null)  ? "--" : `${fmt(lux,0)}`;
-  ppfdEl.textContent    = (ppfd==null) ? "--" : `${fmt(ppfd,1)}`;
-
-  const pumpTxt = pump ? String(pump) : "--";
-  const perTxt  = period ? String(period) : "--";
-  pumpPerEl.textContent = `${pumpTxt} / ${perTxt}`;
-
-  // charts
-  if (tAir != null && !Number.isNaN(Number(tAir))) pushPoint(tempChart, Number(tAir));
-  if (soil != null && !Number.isNaN(Number(soil))) pushPoint(soilChart, Number(soil));
-
-  lastUpEl.textContent = new Date().toLocaleString();
-}
-
-async function loop(){
-  try{
-    const data = await fetchData();
-    setConn(true, "Firebase OK");
-    applyData(data || {});
-  }catch(e){
-    console.error(e);
-    setConn(false, "Firebase ERROR");
+  if (!soilChart) {
+    const ctx = document.getElementById("soilChart")?.getContext("2d");
+    if (ctx) {
+      soilChart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: soilData.labels,
+          datasets: [{ label: "Soil (%)", data: soilData.values, tension: 0.3 }]
+        },
+        options: { responsive: true, animation: false, scales: { y: { min: 0, max: 100 } } }
+      });
+    }
   }
 }
-
-loop();
-setInterval(loop, POLL_MS);
-const DB_URL = "https://smart-irrigation-site-90e51-default-rtdb.firebaseio.com/last.json";
 
 async function loadLast() {
   try {
-    const r = await fetch(DB_URL);
-    const d = await r.json();
+    const res = await fetch(DB_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
 
-    // بدلّي IDs هنا حسب HTML ديالك
-    set("air_temp", d.air_temp);
-    set("air_rh", d.air_rh);
-    set("bmp_temp", d.bmp_temp);
-    set("soil_pct", d.soil_pct);
-    set("lux", d.lux);
-    set("ppfd", d.ppfd);
-    set("pressure_hpa", d.pressure_hpa);
-    set("pump", d.pump);
-    set("irrig_ms", d.irrig_ms);
-    set("crop", d.crop);
+    const d = await res.json();
+    if (!d) throw new Error("No data at /last");
 
-    set("last_update", new Date().toLocaleString());
-    set("status", "Connected ✅");
+    // Format values
+    const airT = (typeof d.air_temp === "number") ? d.air_temp.toFixed(1) : d.air_temp;
+    const rh   = (typeof d.air_rh === "number") ? d.air_rh.toFixed(1) : d.air_rh;
+
+    // soil can be "soil_pct" in your JSON
+    const soilPct = (typeof d.soil_pct === "number") ? d.soil_pct.toFixed(1) : d.soil_pct;
+
+    const lux  = (typeof d.lux === "number") ? d.lux.toFixed(0) : d.lux;
+    const ppfd = (typeof d.ppfd === "number") ? d.ppfd.toFixed(2) : d.ppfd;
+
+    // Update KPI cards
+    setText(el.airTemp, airT);
+    setText(el.airRH, rh);
+    setText(el.soil, soilPct);
+    setText(el.lux, lux);
+    setText(el.ppfd, ppfd);
+
+    // Pump / Period card: show pump + crop (or period if you have it later)
+    const pump = d.pump ?? "--";
+    const crop = d.crop ?? "";
+    setText(el.pumpPeriod, crop ? `${pump} • ${crop}` : pump);
+
+    // Update time
+    setText(el.lastUpdate, new Date().toLocaleString());
+
+    // Charts
+    ensureCharts();
+    const tLabel = new Date().toLocaleTimeString();
+    if (typeof d.air_temp === "number") {
+      pushPoint(tempData, tLabel, d.air_temp);
+      tempChart?.update();
+    }
+    if (typeof d.soil_pct === "number") {
+      pushPoint(soilData, tLabel, d.soil_pct);
+      soilChart?.update();
+    }
+
+    setConnected(true, "Connected ✅");
   } catch (e) {
     console.error(e);
-    set("status", "Error ❌");
+    setConnected(false, "Erreur Firebase ❌");
   }
 }
 
-function set(id, v) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.textContent = (v === undefined || v === null) ? "--" : v;
-}
-
+// Start
+setConnected(false, "Connexion…");
 loadLast();
 setInterval(loadLast, 2000);
-
