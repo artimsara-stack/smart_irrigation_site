@@ -4,370 +4,473 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Smart Irrigation Dashboard</title>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     :root{
       --bg:#0b1220;
-      --card:#121b2f;
-      --text:#e8eefc;
-      --muted:#9fb0d0;
-      --border:rgba(255,255,255,.08);
+      --card:#0f1b33;
+      --card2:#0c172c;
+      --text:#e7eefc;
+      --muted:#a9b6d3;
       --good:#22c55e;
-      --bad:#ef4444;
       --warn:#f59e0b;
-      --chip:#1f2a44;
-      --shadow: 0 14px 30px rgba(0,0,0,.35);
-      --radius:16px;
+      --bad:#ef4444;
+      --line:#1f2f55;
     }
-    [data-theme="light"]{
-      --bg:#f6f7fb;
-      --card:#ffffff;
-      --text:#0b1220;
-      --muted:#55627a;
-      --border:rgba(10,15,30,.10);
-      --chip:#eef2ff;
-      --shadow: 0 14px 30px rgba(20,30,60,.12);
-    }
-
     *{box-sizing:border-box}
     body{
-      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
-      background: radial-gradient(1200px 600px at 20% 0%, rgba(99,102,241,.20), transparent 60%),
-                  radial-gradient(900px 500px at 90% 20%, rgba(34,197,94,.12), transparent 55%),
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color:var(--text);
+      background: radial-gradient(1200px 800px at 30% -10%, #183a7a55, transparent),
+                  radial-gradient(1000px 700px at 100% 20%, #1e4ab655, transparent),
                   var(--bg);
-      color:var(--text);
     }
-    .container{max-width:1200px; margin:0 auto; padding:18px;}
-    header{
-      display:flex; gap:12px; align-items:center; justify-content:space-between;
-      padding:14px 0;
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:16px 18px;
+      border-bottom:1px solid #17284a;
+      background: linear-gradient(180deg, rgba(15,27,51,.75), rgba(15,27,51,.25));
+      position:sticky; top:0; backdrop-filter: blur(10px);
+      z-index:10;
     }
-    .title{
-      display:flex; gap:12px; align-items:center;
+    .title{display:flex; gap:12px; align-items:center}
+    .logo{font-size:26px}
+    h1{margin:0; font-size:18px; font-weight:700}
+    .subtitle{margin:2px 0 0; color:var(--muted); font-size:12px}
+    .status{display:flex; gap:10px; align-items:center}
+    .dot{
+      width:10px; height:10px; border-radius:50%;
+      background: var(--warn); box-shadow: 0 0 10px #f59e0b66;
     }
-    .logo{
-      width:40px; height:40px; border-radius:12px;
-      background: linear-gradient(135deg, rgba(99,102,241,.95), rgba(34,197,94,.85));
-      box-shadow: var(--shadow);
-    }
-    h1{font-size:18px; margin:0}
-    .subtitle{font-size:12px; color:var(--muted); margin-top:2px}
-    .actions{display:flex; gap:10px; align-items:center}
-    .btn{
-      border:1px solid var(--border);
-      background: rgba(255,255,255,.04);
-      color:var(--text);
-      padding:10px 12px;
-      border-radius:12px;
-      cursor:pointer;
-      display:flex; align-items:center; gap:8px;
-      transition:.15s ease;
-    }
-    [data-theme="light"] .btn{background:#fff}
-    .btn:hover{transform: translateY(-1px); box-shadow: var(--shadow)}
-    .pill{
-      padding:8px 10px; border-radius:999px; background:var(--chip);
-      border:1px solid var(--border);
-      color:var(--muted); font-size:12px;
-      display:flex; gap:8px; align-items:center;
-    }
-    .dot{width:8px; height:8px; border-radius:999px; background: var(--warn)}
-    .dot.ok{background: var(--good)}
-    .dot.no{background: var(--bad)}
-
+    .status span{font-size:12px; color:var(--muted)}
+    .wrap{max-width:1180px; margin:0 auto; padding:18px}
     .grid{
       display:grid;
       grid-template-columns: repeat(12, 1fr);
       gap:12px;
     }
     .card{
-      background: rgba(255,255,255,.04);
-      border:1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid #1a2c52;
+      border-radius:14px;
       padding:14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
     }
-    [data-theme="light"] .card{background:#fff}
     .kpi{
       grid-column: span 3;
       min-height:92px;
-      display:flex; flex-direction:column; justify-content:space-between;
     }
-    .kpi .label{font-size:12px; color:var(--muted)}
-    .kpi .value{font-size:26px; font-weight:700; letter-spacing:.2px}
-    .kpi .unit{font-size:12px; color:var(--muted); margin-left:6px; font-weight:500}
-    .kpi .sub{font-size:12px; color:var(--muted)}
+    .kpi .label{color:var(--muted); font-size:12px; display:flex; justify-content:space-between; gap:10px}
+    .kpi .value{font-size:26px; margin-top:8px; font-weight:800; letter-spacing:.3px}
     .badge{
-      display:inline-flex; align-items:center; gap:8px;
-      padding:8px 10px;
-      border-radius:999px;
-      border:1px solid var(--border);
-      background: var(--chip);
-      font-weight:700;
+      font-size:11px; padding:3px 8px; border-radius:999px;
+      border:1px solid #2a3e6f; color:var(--muted);
+      background: rgba(15,27,51,.45);
+      white-space:nowrap;
     }
-    .badge.on{color: var(--good)}
-    .badge.off{color: var(--bad)}
-    .badge .bDot{width:10px; height:10px; border-radius:999px}
-    .badge.on .bDot{background: var(--good)}
-    .badge.off .bDot{background: var(--bad)}
+    .badge.good{border-color:#1f7a3a; color:#baf7cf; background:#0e2b19}
+    .badge.warn{border-color:#8a5b0e; color:#ffe6b4; background:#2a1a04}
+    .badge.bad{border-color:#7a1f1f; color:#ffb7b7; background:#2a0c0c}
 
-    .wide{grid-column: span 6;}
-    .full{grid-column: span 12;}
-    .charts{display:grid; grid-template-columns:repeat(12, 1fr); gap:12px;}
-    .chartCard{grid-column: span 6; min-height:320px;}
-    .chartCard canvas{width:100% !important; height:260px !important;}
-
-    .footer{
-      margin-top:14px; color:var(--muted); font-size:12px; text-align:center;
-      opacity:.9;
+    .chart{
+      grid-column: span 6;
+      min-height:320px;
+      padding:14px 14px 10px;
+    }
+    .chart h3{
+      margin:0 0 10px;
+      font-size:13px;
+      color:var(--muted);
+      font-weight:700;
+      letter-spacing:.3px;
+    }
+    canvas{width:100% !important; height:250px !important;}
+    .row2{margin-top:12px}
+    .small{grid-column: span 4; min-height:320px}
+    .note{
+      color:var(--muted);
+      font-size:12px;
+      margin-top:10px;
+      line-height:1.4;
     }
 
     @media (max-width: 1000px){
       .kpi{grid-column: span 6;}
-      .chartCard{grid-column: span 12;}
-      .wide{grid-column: span 12;}
+      .chart{grid-column: span 12;}
+      .small{grid-column: span 12;}
     }
   </style>
 </head>
 
-<body data-theme="dark">
-  <div class="container">
-    <header>
-      <div class="title">
-        <div class="logo"></div>
-        <div>
-          <h1>Smart Irrigation — Dashboard</h1>
-          <div class="subtitle">ESP32 → Firebase RTDB → GitHub Pages</div>
-        </div>
+<body>
+  <header class="topbar">
+    <div class="title">
+      <div class="logo">🌱</div>
+      <div>
+        <h1>Smart Irrigation Dashboard</h1>
+        <p class="subtitle">ESP32 • Firebase RTDB • KPI & Graphs</p>
       </div>
+    </div>
 
-      <div class="actions">
-        <div class="pill"><span class="dot" id="dot"></span><span id="statusTxt">Waiting data…</span></div>
-        <button class="btn" id="themeBtn">🌓 Theme</button>
-        <button class="btn" id="refreshBtn">🔄 Refresh</button>
-      </div>
-    </header>
+    <div class="status">
+      <div id="connDot" class="dot"></div>
+      <span id="connText">Connexion…</span>
+      <span class="badge" id="lastUpdate">—</span>
+    </div>
+  </header>
 
-    <!-- KPIs -->
+  <main class="wrap">
     <section class="grid">
+      <!-- KPI CARDS -->
       <div class="card kpi">
-        <div class="label">Air Temperature</div>
-        <div class="value"><span id="airT">--</span><span class="unit">°C</span></div>
-        <div class="sub" id="timeLbl">Last update: --</div>
+        <div class="label">Température Air <span class="badge" id="periodBadge">—</span></div>
+        <div class="value"><span id="airTemp">--</span> °C</div>
       </div>
 
       <div class="card kpi">
-        <div class="label">Air Humidity</div>
-        <div class="value"><span id="airRH">--</span><span class="unit">%</span></div>
-        <div class="sub">DHT22</div>
+        <div class="label">Humidité Air <span class="badge" id="pumpBadge">—</span></div>
+        <div class="value"><span id="airRh">--</span> %</div>
       </div>
 
       <div class="card kpi">
-        <div class="label">Soil Moisture (monitor)</div>
-        <div class="value"><span id="soil">--</span><span class="unit">%</span></div>
-        <div class="sub">Not controlling</div>
+        <div class="label">Humidité Sol <span class="badge" id="soilBadge">—</span></div>
+        <div class="value"><span id="soil">--</span> %</div>
       </div>
 
       <div class="card kpi">
-        <div class="label">Light (PPFD)</div>
-        <div class="value"><span id="ppfd">--</span><span class="unit">~</span></div>
-        <div class="sub"><span id="lux">--</span> lux</div>
+        <div class="label">Lumière (Lux) <span class="badge">PPFD</span></div>
+        <div class="value"><span id="lux">--</span> / <span id="ppfd">--</span></div>
       </div>
 
       <div class="card kpi">
-        <div class="label">Wind Speed</div>
-        <div class="value"><span id="wind">--</span><span class="unit">m/s</span></div>
-        <div class="sub">Anemometer</div>
+        <div class="label">VPD <span class="badge">kPa</span></div>
+        <div class="value"><span id="vpd">--</span></div>
       </div>
 
       <div class="card kpi">
-        <div class="label">Pressure</div>
-        <div class="value"><span id="press">--</span><span class="unit">hPa</span></div>
-        <div class="sub">BMP280 / fallback</div>
+        <div class="label">EDI <span class="badge">Demande</span></div>
+        <div class="value"><span id="edi">--</span></div>
       </div>
 
-      <div class="card wide">
-        <div class="label" style="color:var(--muted);font-size:12px;">Control summary</div>
-        <div style="display:flex; gap:12px; align-items:center; margin-top:10px; flex-wrap:wrap;">
-          <span class="badge" id="pumpBadge"><span class="bDot"></span><span id="pumpTxt">PUMP --</span></span>
-          <span class="pill">VPD: <b id="vpd">--</b> kPa</span>
-          <span class="pill">EDI: <b id="edi">--</b></span>
+      <div class="card kpi">
+        <div class="label">Vent <span class="badge">m/s</span></div>
+        <div class="value"><span id="wind">--</span></div>
+      </div>
+
+      <div class="card kpi">
+        <div class="label">Pression <span class="badge">hPa</span></div>
+        <div class="value"><span id="pressure">--</span></div>
+      </div>
+
+      <!-- CHARTS -->
+      <div class="card chart">
+        <h3>Température & Humidité (Air)</h3>
+        <canvas id="chartAir"></canvas>
+      </div>
+
+      <div class="card chart">
+        <h3>Sol / Lumière / Vent</h3>
+        <canvas id="chartEnv"></canvas>
+      </div>
+
+      <div class="card small">
+        <h3 style="margin:0 0 10px; color:var(--muted); font-size:13px;">Dernières valeurs (log)</h3>
+        <div id="log" class="note"></div>
+      </div>
+
+      <div class="card small">
+        <h3 style="margin:0 0 10px; color:var(--muted); font-size:13px;">KPIs (rappel)</h3>
+        <div class="note" id="kpiText">
+          • Commande basée sur facteurs (période via lumière), température, RH, rayonnement, vent.<br>
+          • Le sol est conservé en mesure pour validation des calculs (pas de commande directe si vous le souhaitez).
         </div>
-        <div class="subtitle" style="margin-top:10px;">
-          Pump control is climate-based (T/RH/Light/Wind/Pressure). Soil is only for validation.
-        </div>
       </div>
 
-      <div class="card wide">
-        <div class="label" style="color:var(--muted);font-size:12px;">Thresholds (example)</div>
-        <div class="subtitle" style="margin-top:10px;">
-          EDI ≥ 1.4 → Strong irrigation • EDI ≥ 0.8 → Light irrigation • otherwise OFF
-        </div>
-        <div class="subtitle">
-          Adjust coefficients after field tests.
-        </div>
+      <div class="card small">
+        <h3 style="margin:0 0 10px; color:var(--muted); font-size:13px;">État</h3>
+        <div class="note" id="stateText">—</div>
       </div>
     </section>
+  </main>
 
-    <!-- Charts -->
-    <section class="charts" style="margin-top:12px;">
-      <div class="card chartCard"><div class="label" style="color:var(--muted);font-size:12px;">Air Temperature (°C)</div><canvas id="cTemp"></canvas></div>
-      <div class="card chartCard"><div class="label" style="color:var(--muted);font-size:12px;">Soil Moisture (%)</div><canvas id="cSoil"></canvas></div>
-      <div class="card chartCard"><div class="label" style="color:var(--muted);font-size:12px;">Wind Speed (m/s)</div><canvas id="cWind"></canvas></div>
-      <div class="card chartCard"><div class="label" style="color:var(--muted);font-size:12px;">Pressure (hPa)</div><canvas id="cPress"></canvas></div>
-      <div class="card chartCard"><div class="label" style="color:var(--muted);font-size:12px;">EDI (index)</div><canvas id="cEdi"></canvas></div>
-      <div class="card chartCard"><div class="label" style="color:var(--muted);font-size:12px;">PPFD (~)</div><canvas id="cPpfd"></canvas></div>
-    </section>
+  <script>
+    // ===================== FIREBASE RTDB (REST) =====================
+    const FIREBASE_DB = "https://smart-irrigation-site-90e51-default-rtdb.firebaseio.com";
+    const DB_PATH = "/readings"; // <-- بدليها إذا كانت مختلفة فـ ESP
+    const LIMIT = 60;            // عدد النقاط فالگراف
 
-    <div class="footer">© Smart Irrigation • Dashboard v2</div>
-  </div>
+    // إذا عندكم rules public ما تحتاجوش auth
+    function buildUrlLatest() {
+      // latest by key
+      return `${FIREBASE_DB}${DB_PATH}.json?orderBy="$key"&limitToLast=1`;
+    }
+    function buildUrlHistory() {
+      return `${FIREBASE_DB}${DB_PATH}.json?orderBy="$key"&limitToLast=${LIMIT}`;
+    }
 
-<script>
-  // ✅ Your Firebase RTDB
-  const DB = "https://smart-irrigation-site-90e51-default-rtdb.firebaseio.com";
+    // ===================== HELPERS =====================
+    const el = id => document.getElementById(id);
+    const fmt = (v, d=1) => (v===null || v===undefined || Number.isNaN(v)) ? "--" : Number(v).toFixed(d);
 
-  // If you kept rules requiring "secret" for reads, add it here.
-  // In your current approach, reads usually remain open.
-  const READ_QUERY = ""; // example: "?auth=..." if needed
+    function setConn(ok){
+      el("connDot").style.background = ok ? "var(--good)" : "var(--bad)";
+      el("connDot").style.boxShadow = ok ? "0 0 10px #22c55e66" : "0 0 10px #ef444466";
+      el("connText").textContent = ok ? "Connecté" : "Hors ligne";
+    }
 
-  const el = (id)=>document.getElementById(id);
+    // VPD (kPa) from T (°C) and RH (%)
+    function computeVPD(T, RH){
+      if(!isFinite(T) || !isFinite(RH)) return NaN;
+      const es = 0.6108 * Math.exp((17.27*T)/(T+237.3));
+      const ea = es * (RH/100);
+      return es - ea;
+    }
 
-  // Theme toggle
-  const themeBtn = el("themeBtn");
-  themeBtn.addEventListener("click", ()=>{
-    const b = document.body;
-    b.dataset.theme = (b.dataset.theme === "dark") ? "light" : "dark";
-  });
+    // Période depuis PPFD (même logique ESP)
+    const PPFD_NIGHT_TH=30, PPFD_MORNING_TH=120, PPFD_EVENING_TH=250;
+    function periodFromPPFD(ppfd){
+      if(!isFinite(ppfd)) return "NIGHT";
+      if(ppfd < PPFD_NIGHT_TH) return "NIGHT";
+      if(ppfd < PPFD_MORNING_TH) return "MORN";
+      if(ppfd < PPFD_EVENING_TH) return "EVE";
+      return "DAY";
+    }
+    function F_time(period){
+      if(period==="NIGHT") return 0.6;
+      if(period==="DAY") return 1.3;
+      return 1.0;
+    }
 
-  el("refreshBtn").addEventListener("click", ()=>tick(true));
+    // EDI = product of factors like in ESP (proxy)
+    const ALPHA_T=0.05, BETA_RH=0.02, GAMMA_R=0.001;
+    // KPI thresholds (Tomate default)
+    const T_OPT_MAX=26, RH_MIN=60, PPFD_OPT_MAX=350;
 
-  // Charts
-  function makeLineChart(canvasId, label){
-    return new Chart(el(canvasId), {
-      type:"line",
-      data:{labels:[], datasets:[{label, data:[]}]},
-      options:{
-        responsive:true,
-        animation:false,
-        plugins:{legend:{display:false}},
-        scales:{
-          x:{ticks:{maxTicksLimit:10}},
-          y:{beginAtZero:false}
+    function F_T(T){
+      if(!isFinite(T)) return 1.0;
+      if(T <= T_OPT_MAX) return 1.0;
+      return 1.0 + ALPHA_T * (T - T_OPT_MAX);
+    }
+    function F_RH(RH){
+      if(!isFinite(RH)) return 1.0;
+      if(RH >= RH_MIN) return 1.0;
+      return 1.0 + BETA_RH * (RH_MIN - RH);
+    }
+    function F_R(PPFD){
+      if(!isFinite(PPFD)) return 1.0;
+      if(PPFD <= PPFD_OPT_MAX) return 1.0;
+      return 1.0 + GAMMA_R * (PPFD - PPFD_OPT_MAX);
+    }
+    function clamp(x,a,b){ return Math.min(b, Math.max(a, x)); }
+
+    function computeEDI({tAir,rh,ppfd}){
+      const p = periodFromPPFD(ppfd);
+      const edi = clamp(F_time(p),0.5,1.5) * clamp(F_T(tAir),0.8,1.8) * clamp(F_RH(rh),0.8,1.8) * clamp(F_R(ppfd),0.8,1.8);
+      return {edi, period:p};
+    }
+
+    // wind field fallback
+    function getWind(obj){
+      const candidates = ["wind", "wind_ms", "windSpeed", "wind_speed", "anemo_ms", "anemometer", "vent"];
+      for(const k of candidates){
+        if(obj && isFinite(obj[k])) return Number(obj[k]);
+      }
+      return NaN;
+    }
+
+    // ===================== CHARTS =====================
+    let chartAir, chartEnv;
+
+    function makeCharts(){
+      const ctxAir = document.getElementById("chartAir").getContext("2d");
+      const ctxEnv = document.getElementById("chartEnv").getContext("2d");
+
+      chartAir = new Chart(ctxAir, {
+        type: "line",
+        data: { labels: [], datasets: [
+          { label: "Temp (°C)", data: [], tension:0.25, borderWidth:2, pointRadius:0 },
+          { label: "RH (%)", data: [], tension:0.25, borderWidth:2, pointRadius:0 },
+        ]},
+        options: {
+          responsive:true,
+          plugins:{ legend:{ labels:{ color:"#cfe0ff" } } },
+          scales:{
+            x:{ ticks:{ color:"#a9b6d3" }, grid:{ color:"#1f2f55" } },
+            y:{ ticks:{ color:"#a9b6d3" }, grid:{ color:"#1f2f55" } },
+          }
         }
-      }
-    });
-  }
+      });
 
-  const chTemp = makeLineChart("cTemp", "Temp");
-  const chSoil = makeLineChart("cSoil", "Soil");
-  const chWind = makeLineChart("cWind", "Wind");
-  const chPress= makeLineChart("cPress","Pressure");
-  const chEdi  = makeLineChart("cEdi","EDI");
-  const chPpfd = makeLineChart("cPpfd","PPFD");
-
-  function setPumpBadge(state){
-    const badge = el("pumpBadge");
-    const txt = el("pumpTxt");
-    if(state === "ON"){
-      badge.classList.add("on"); badge.classList.remove("off");
-      txt.textContent = "PUMP ON";
-    }else{
-      badge.classList.add("off"); badge.classList.remove("on");
-      txt.textContent = "PUMP OFF";
+      chartEnv = new Chart(ctxEnv, {
+        type: "line",
+        data: { labels: [], datasets: [
+          { label: "Sol (%)", data: [], tension:0.25, borderWidth:2, pointRadius:0 },
+          { label: "PPFD", data: [], tension:0.25, borderWidth:2, pointRadius:0 },
+          { label: "Vent (m/s)", data: [], tension:0.25, borderWidth:2, pointRadius:0 },
+        ]},
+        options: {
+          responsive:true,
+          plugins:{ legend:{ labels:{ color:"#cfe0ff" } } },
+          scales:{
+            x:{ ticks:{ color:"#a9b6d3" }, grid:{ color:"#1f2f55" } },
+            y:{ ticks:{ color:"#a9b6d3" }, grid:{ color:"#1f2f55" } },
+          }
+        }
+      });
     }
-  }
 
-  function setOnline(ok, msg){
-    const dot = el("dot");
-    dot.classList.remove("ok","no");
-    dot.classList.add(ok ? "ok" : "no");
-    el("statusTxt").textContent = msg;
-  }
+    function updateCharts(points){
+      // points: array sorted
+      const labels = points.map(p => p._t || p._key.slice(-4)); // last digits of key if no time
+      chartAir.data.labels = labels;
+      chartAir.data.datasets[0].data = points.map(p => p.air_temp);
+      chartAir.data.datasets[1].data = points.map(p => p.air_rh);
+      chartAir.update("none");
 
-  function fmt(x, n=1){
-    if(x === null || x === undefined) return "--";
-    const v = Number(x);
-    if(Number.isNaN(v)) return "--";
-    return v.toFixed(n);
-  }
-
-  // Read last + history
-  async function fetchJSON(url){
-    const r = await fetch(url);
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    return await r.json();
-  }
-
-  function updateLast(d){
-    // fields from ESP32 payload
-    el("airT").textContent  = fmt(d.air_temp,1);
-    el("airRH").textContent = fmt(d.air_rh,1);
-    el("soil").textContent  = fmt(d.soil_pct,1);
-
-    el("lux").textContent   = (d.lux ?? "--");
-    el("ppfd").textContent  = fmt(d.ppfd,1);
-
-    el("wind").textContent  = fmt(d.wind_ms,2);
-    el("press").textContent = fmt(d.pressure_hpa,1);
-
-    el("vpd").textContent   = fmt(d.vpd,2);
-    el("edi").textContent   = fmt(d.edi,2);
-
-    setPumpBadge(d.pump || "OFF");
-
-    // timestamp label (we only have millis ts in your code)
-    el("timeLbl").textContent = "Last update: just now";
-  }
-
-  function updateCharts(list){
-    const labels = list.map((_,i)=> String(i+1));
-
-    const map = (k)=> list.map(x => (x && x[k] !== undefined) ? Number(x[k]) : null);
-
-    chTemp.data.labels = labels;
-    chSoil.data.labels = labels;
-    chWind.data.labels = labels;
-    chPress.data.labels= labels;
-    chEdi.data.labels  = labels;
-    chPpfd.data.labels = labels;
-
-    chTemp.data.datasets[0].data = map("air_temp");
-    chSoil.data.datasets[0].data = map("soil_pct");
-    chWind.data.datasets[0].data = map("wind_ms");
-    chPress.data.datasets[0].data= map("pressure_hpa");
-    chEdi.data.datasets[0].data  = map("edi");
-    chPpfd.data.datasets[0].data = map("ppfd");
-
-    chTemp.update(); chSoil.update(); chWind.update();
-    chPress.update(); chEdi.update(); chPpfd.update();
-  }
-
-  async function tick(force=false){
-    try{
-      const last = await fetchJSON(`${DB}/last.json${READ_QUERY}`);
-      if(last){
-        updateLast(last);
-        setOnline(true, "Live");
-      }else{
-        setOnline(false, "No data yet");
-      }
-
-      // history is an object if you use POST push
-      const histObj = await fetchJSON(`${DB}/history.json?orderBy="$key"&limitToLast=30${READ_QUERY ? "&"+READ_QUERY.slice(1) : ""}`);
-      if(histObj){
-        const keys = Object.keys(histObj).sort((a,b)=>a.localeCompare(b));
-        const list = keys.map(k => histObj[k]);
-        updateCharts(list);
-      }
-    }catch(e){
-      console.log(e);
-      setOnline(false, "Offline / fetch error");
+      chartEnv.data.labels = labels;
+      chartEnv.data.datasets[0].data = points.map(p => p.soil);
+      chartEnv.data.datasets[1].data = points.map(p => p.ppfd);
+      chartEnv.data.datasets[2].data = points.map(p => p.wind);
+      chartEnv.update("none");
     }
-  }
 
-  setInterval(()=>tick(false), 3000);
-  tick(true);
-</script>
+    // ===================== UI UPDATE =====================
+    function badge(elm, txt, cls){
+      elm.textContent = txt;
+      elm.classList.remove("good","warn","bad");
+      if(cls) elm.classList.add(cls);
+    }
+
+    function updateUI(latest){
+      const tAir = Number(latest.air_temp);
+      const rh   = Number(latest.air_rh);
+      const soil = Number(latest.soil);
+      const lux  = Number(latest.lux);
+      const ppfd = Number(latest.ppfd);
+      const pressure = Number(latest.pressure_hpa);
+      const pump = latest.pump || "--";
+      const wind = getWind(latest);
+
+      // Compute VPD + EDI
+      const vpd = computeVPD(tAir, rh);
+      const {edi, period} = computeEDI({tAir, rh, ppfd});
+
+      el("airTemp").textContent = fmt(tAir,1);
+      el("airRh").textContent   = fmt(rh,0);
+      el("soil").textContent    = fmt(soil,0);
+      el("lux").textContent     = fmt(lux,0);
+      el("ppfd").textContent    = fmt(ppfd,0);
+
+      el("vpd").textContent     = fmt(vpd,2);
+      el("edi").textContent     = fmt(edi,2);
+
+      el("wind").textContent    = fmt(wind,2);
+      el("pressure").textContent= fmt(pressure,1);
+
+      // Period badge
+      badge(el("periodBadge"), period, period==="DAY" ? "good" : (period==="NIGHT" ? "bad" : "warn"));
+
+      // Pump badge
+      badge(el("pumpBadge"), pump, pump==="ON" ? "warn" : "good");
+
+      // Soil badge simple info
+      if(isFinite(soil)){
+        let cls="good", txt="OK";
+        if(soil < 40) {cls="bad"; txt="SEC";}
+        else if(soil < 55) {cls="warn"; txt="BAS";}
+        badge(el("soilBadge"), txt, cls);
+      } else badge(el("soilBadge"), "—", "");
+
+      // last update
+      const now = new Date();
+      el("lastUpdate").textContent = now.toLocaleTimeString();
+
+      // state text
+      el("stateText").innerHTML =
+        `Période: <b>${period}</b><br>` +
+        `Pompe: <b>${pump}</b><br>` +
+        `VPD: <b>${fmt(vpd,2)} kPa</b> • EDI: <b>${fmt(edi,2)}</b><br>` +
+        `Vent: <b>${fmt(wind,2)} m/s</b> • Pression: <b>${fmt(pressure,1)} hPa</b>`;
+    }
+
+    function updateLog(latest){
+      const wind = getWind(latest);
+      const rows = [
+        `air_temp: ${latest.air_temp}`,
+        `air_rh: ${latest.air_rh}`,
+        `soil: ${latest.soil}`,
+        `lux: ${latest.lux}`,
+        `ppfd: ${latest.ppfd}`,
+        `wind: ${isFinite(wind)?wind:"(no field)"} `,
+        `bmp_temp: ${latest.bmp_temp}`,
+        `pressure_hpa: ${latest.pressure_hpa}`,
+        `pump: ${latest.pump}`,
+        `period: ${latest.period}`
+      ];
+      el("log").innerHTML = rows.map(r => `• ${r}`).join("<br>");
+    }
+
+    // ===================== FETCH =====================
+    async function fetchJson(url){
+      const r = await fetch(url);
+      if(!r.ok) throw new Error("HTTP " + r.status);
+      return await r.json();
+    }
+
+    function normalizeHistory(obj){
+      // obj is key -> payload
+      if(!obj) return [];
+      const keys = Object.keys(obj).sort();
+      return keys.map(k => {
+        const v = obj[k] || {};
+        const wind = getWind(v);
+        return {
+          _key:k,
+          _t: v.time || v.timestamp || v.ts || null,
+          air_temp: Number(v.air_temp),
+          air_rh: Number(v.air_rh),
+          soil: Number(v.soil),
+          lux: Number(v.lux),
+          ppfd: Number(v.ppfd),
+          wind: isFinite(wind) ? wind : NaN
+        };
+      });
+    }
+
+    async function refresh(){
+      try{
+        const [latestObj, histObj] = await Promise.all([
+          fetchJson(buildUrlLatest()),
+          fetchJson(buildUrlHistory())
+        ]);
+
+        setConn(true);
+
+        // latestObj is {key:{...}}
+        const latestKey = latestObj ? Object.keys(latestObj)[0] : null;
+        const latest = latestKey ? latestObj[latestKey] : null;
+
+        if(latest){
+          updateUI(latest);
+          updateLog(latest);
+        }
+
+        const points = normalizeHistory(histObj);
+        if(points.length) updateCharts(points);
+
+      }catch(e){
+        setConn(false);
+        el("connText").textContent = "Erreur Firebase";
+      }
+    }
+
+    // ===================== INIT =====================
+    makeCharts();
+    refresh();
+    setInterval(refresh, 2500);
+  </script>
 </body>
 </html>
