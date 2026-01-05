@@ -4,79 +4,370 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Smart Irrigation Dashboard</title>
-  <link rel="stylesheet" href="style.css" />
-
-  <!-- Charts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root{
+      --bg:#0b1220;
+      --card:#121b2f;
+      --text:#e8eefc;
+      --muted:#9fb0d0;
+      --border:rgba(255,255,255,.08);
+      --good:#22c55e;
+      --bad:#ef4444;
+      --warn:#f59e0b;
+      --chip:#1f2a44;
+      --shadow: 0 14px 30px rgba(0,0,0,.35);
+      --radius:16px;
+    }
+    [data-theme="light"]{
+      --bg:#f6f7fb;
+      --card:#ffffff;
+      --text:#0b1220;
+      --muted:#55627a;
+      --border:rgba(10,15,30,.10);
+      --chip:#eef2ff;
+      --shadow: 0 14px 30px rgba(20,30,60,.12);
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background: radial-gradient(1200px 600px at 20% 0%, rgba(99,102,241,.20), transparent 60%),
+                  radial-gradient(900px 500px at 90% 20%, rgba(34,197,94,.12), transparent 55%),
+                  var(--bg);
+      color:var(--text);
+    }
+    .container{max-width:1200px; margin:0 auto; padding:18px;}
+    header{
+      display:flex; gap:12px; align-items:center; justify-content:space-between;
+      padding:14px 0;
+    }
+    .title{
+      display:flex; gap:12px; align-items:center;
+    }
+    .logo{
+      width:40px; height:40px; border-radius:12px;
+      background: linear-gradient(135deg, rgba(99,102,241,.95), rgba(34,197,94,.85));
+      box-shadow: var(--shadow);
+    }
+    h1{font-size:18px; margin:0}
+    .subtitle{font-size:12px; color:var(--muted); margin-top:2px}
+    .actions{display:flex; gap:10px; align-items:center}
+    .btn{
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.04);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      display:flex; align-items:center; gap:8px;
+      transition:.15s ease;
+    }
+    [data-theme="light"] .btn{background:#fff}
+    .btn:hover{transform: translateY(-1px); box-shadow: var(--shadow)}
+    .pill{
+      padding:8px 10px; border-radius:999px; background:var(--chip);
+      border:1px solid var(--border);
+      color:var(--muted); font-size:12px;
+      display:flex; gap:8px; align-items:center;
+    }
+    .dot{width:8px; height:8px; border-radius:999px; background: var(--warn)}
+    .dot.ok{background: var(--good)}
+    .dot.no{background: var(--bad)}
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap:12px;
+    }
+    .card{
+      background: rgba(255,255,255,.04);
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding:14px;
+    }
+    [data-theme="light"] .card{background:#fff}
+    .kpi{
+      grid-column: span 3;
+      min-height:92px;
+      display:flex; flex-direction:column; justify-content:space-between;
+    }
+    .kpi .label{font-size:12px; color:var(--muted)}
+    .kpi .value{font-size:26px; font-weight:700; letter-spacing:.2px}
+    .kpi .unit{font-size:12px; color:var(--muted); margin-left:6px; font-weight:500}
+    .kpi .sub{font-size:12px; color:var(--muted)}
+    .badge{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:8px 10px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background: var(--chip);
+      font-weight:700;
+    }
+    .badge.on{color: var(--good)}
+    .badge.off{color: var(--bad)}
+    .badge .bDot{width:10px; height:10px; border-radius:999px}
+    .badge.on .bDot{background: var(--good)}
+    .badge.off .bDot{background: var(--bad)}
+
+    .wide{grid-column: span 6;}
+    .full{grid-column: span 12;}
+    .charts{display:grid; grid-template-columns:repeat(12, 1fr); gap:12px;}
+    .chartCard{grid-column: span 6; min-height:320px;}
+    .chartCard canvas{width:100% !important; height:260px !important;}
+
+    .footer{
+      margin-top:14px; color:var(--muted); font-size:12px; text-align:center;
+      opacity:.9;
+    }
+
+    @media (max-width: 1000px){
+      .kpi{grid-column: span 6;}
+      .chartCard{grid-column: span 12;}
+      .wide{grid-column: span 12;}
+    }
+  </style>
 </head>
 
-<body>
-  <header class="topbar">
-    <div class="title">
-      <span class="logo">🌱</span>
-      <div>
-        <h1>Smart Irrigation Dashboard</h1>
-        <p class="subtitle">ESP32 • Firebase • KPI</p>
-      </div>
-    </div>
-    <div class="status">
-      <span id="connDot" class="dot"></span>
-      <span id="connText">Connexion…</span>
-    </div>
-  </header>
-
-  <main class="container">
-    <!-- KPI Cards -->
-    <section class="cards">
-      <div class="card">
-        <div class="label">Air Temp (°C)</div>
-        <div class="value" id="airTemp">--</div>
+<body data-theme="dark">
+  <div class="container">
+    <header>
+      <div class="title">
+        <div class="logo"></div>
+        <div>
+          <h1>Smart Irrigation — Dashboard</h1>
+          <div class="subtitle">ESP32 → Firebase RTDB → GitHub Pages</div>
+        </div>
       </div>
 
-      <div class="card">
-        <div class="label">Air RH (%)</div>
-        <div class="value" id="airRH">--</div>
+      <div class="actions">
+        <div class="pill"><span class="dot" id="dot"></span><span id="statusTxt">Waiting data…</span></div>
+        <button class="btn" id="themeBtn">🌓 Theme</button>
+        <button class="btn" id="refreshBtn">🔄 Refresh</button>
+      </div>
+    </header>
+
+    <!-- KPIs -->
+    <section class="grid">
+      <div class="card kpi">
+        <div class="label">Air Temperature</div>
+        <div class="value"><span id="airT">--</span><span class="unit">°C</span></div>
+        <div class="sub" id="timeLbl">Last update: --</div>
       </div>
 
-      <div class="card">
-        <div class="label">Soil (%)</div>
-        <div class="value" id="soil">--</div>
+      <div class="card kpi">
+        <div class="label">Air Humidity</div>
+        <div class="value"><span id="airRH">--</span><span class="unit">%</span></div>
+        <div class="sub">DHT22</div>
       </div>
 
-      <div class="card">
-        <div class="label">Lux</div>
-        <div class="value" id="lux">--</div>
+      <div class="card kpi">
+        <div class="label">Soil Moisture (monitor)</div>
+        <div class="value"><span id="soil">--</span><span class="unit">%</span></div>
+        <div class="sub">Not controlling</div>
       </div>
 
-      <div class="card">
-        <div class="label">PPFD</div>
-        <div class="value" id="ppfd">--</div>
+      <div class="card kpi">
+        <div class="label">Light (PPFD)</div>
+        <div class="value"><span id="ppfd">--</span><span class="unit">~</span></div>
+        <div class="sub"><span id="lux">--</span> lux</div>
       </div>
 
-      <div class="card">
-        <div class="label">Pump / Period</div>
-        <div class="value" id="pumpPeriod">--</div>
+      <div class="card kpi">
+        <div class="label">Wind Speed</div>
+        <div class="value"><span id="wind">--</span><span class="unit">m/s</span></div>
+        <div class="sub">Anemometer</div>
+      </div>
+
+      <div class="card kpi">
+        <div class="label">Pressure</div>
+        <div class="value"><span id="press">--</span><span class="unit">hPa</span></div>
+        <div class="sub">BMP280 / fallback</div>
+      </div>
+
+      <div class="card wide">
+        <div class="label" style="color:var(--muted);font-size:12px;">Control summary</div>
+        <div style="display:flex; gap:12px; align-items:center; margin-top:10px; flex-wrap:wrap;">
+          <span class="badge" id="pumpBadge"><span class="bDot"></span><span id="pumpTxt">PUMP --</span></span>
+          <span class="pill">VPD: <b id="vpd">--</b> kPa</span>
+          <span class="pill">EDI: <b id="edi">--</b></span>
+        </div>
+        <div class="subtitle" style="margin-top:10px;">
+          Pump control is climate-based (T/RH/Light/Wind/Pressure). Soil is only for validation.
+        </div>
+      </div>
+
+      <div class="card wide">
+        <div class="label" style="color:var(--muted);font-size:12px;">Thresholds (example)</div>
+        <div class="subtitle" style="margin-top:10px;">
+          EDI ≥ 1.4 → Strong irrigation • EDI ≥ 0.8 → Light irrigation • otherwise OFF
+        </div>
+        <div class="subtitle">
+          Adjust coefficients after field tests.
+        </div>
       </div>
     </section>
 
     <!-- Charts -->
-    <section class="charts">
-      <div class="panel">
-        <div class="panelTitle">Air Temperature</div>
-        <canvas id="tempChart"></canvas>
-      </div>
-
-      <div class="panel">
-        <div class="panelTitle">Soil Moisture</div>
-        <canvas id="soilChart"></canvas>
-      </div>
+    <section class="charts" style="margin-top:12px;">
+      <div class="card chartCard"><div class="label" style="color:var(--muted);font-size:12px;">Air Temperature (°C)</div><canvas id="cTemp"></canvas></div>
+      <div class="card chartCard"><div class="label" style="color:var(--muted);font-size:12px;">Soil Moisture (%)</div><canvas id="cSoil"></canvas></div>
+      <div class="card chartCard"><div class="label" style="color:var(--muted);font-size:12px;">Wind Speed (m/s)</div><canvas id="cWind"></canvas></div>
+      <div class="card chartCard"><div class="label" style="color:var(--muted);font-size:12px;">Pressure (hPa)</div><canvas id="cPress"></canvas></div>
+      <div class="card chartCard"><div class="label" style="color:var(--muted);font-size:12px;">EDI (index)</div><canvas id="cEdi"></canvas></div>
+      <div class="card chartCard"><div class="label" style="color:var(--muted);font-size:12px;">PPFD (~)</div><canvas id="cPpfd"></canvas></div>
     </section>
 
-    <footer class="footer">
-      <span>Dernière mise à jour: </span><span id="lastUpdate">--</span>
-    </footer>
-  </main>
+    <div class="footer">© Smart Irrigation • Dashboard v2</div>
+  </div>
 
-  <script src="app.js"></script>
+<script>
+  // ✅ Your Firebase RTDB
+  const DB = "https://smart-irrigation-site-90e51-default-rtdb.firebaseio.com";
+
+  // If you kept rules requiring "secret" for reads, add it here.
+  // In your current approach, reads usually remain open.
+  const READ_QUERY = ""; // example: "?auth=..." if needed
+
+  const el = (id)=>document.getElementById(id);
+
+  // Theme toggle
+  const themeBtn = el("themeBtn");
+  themeBtn.addEventListener("click", ()=>{
+    const b = document.body;
+    b.dataset.theme = (b.dataset.theme === "dark") ? "light" : "dark";
+  });
+
+  el("refreshBtn").addEventListener("click", ()=>tick(true));
+
+  // Charts
+  function makeLineChart(canvasId, label){
+    return new Chart(el(canvasId), {
+      type:"line",
+      data:{labels:[], datasets:[{label, data:[]}]},
+      options:{
+        responsive:true,
+        animation:false,
+        plugins:{legend:{display:false}},
+        scales:{
+          x:{ticks:{maxTicksLimit:10}},
+          y:{beginAtZero:false}
+        }
+      }
+    });
+  }
+
+  const chTemp = makeLineChart("cTemp", "Temp");
+  const chSoil = makeLineChart("cSoil", "Soil");
+  const chWind = makeLineChart("cWind", "Wind");
+  const chPress= makeLineChart("cPress","Pressure");
+  const chEdi  = makeLineChart("cEdi","EDI");
+  const chPpfd = makeLineChart("cPpfd","PPFD");
+
+  function setPumpBadge(state){
+    const badge = el("pumpBadge");
+    const txt = el("pumpTxt");
+    if(state === "ON"){
+      badge.classList.add("on"); badge.classList.remove("off");
+      txt.textContent = "PUMP ON";
+    }else{
+      badge.classList.add("off"); badge.classList.remove("on");
+      txt.textContent = "PUMP OFF";
+    }
+  }
+
+  function setOnline(ok, msg){
+    const dot = el("dot");
+    dot.classList.remove("ok","no");
+    dot.classList.add(ok ? "ok" : "no");
+    el("statusTxt").textContent = msg;
+  }
+
+  function fmt(x, n=1){
+    if(x === null || x === undefined) return "--";
+    const v = Number(x);
+    if(Number.isNaN(v)) return "--";
+    return v.toFixed(n);
+  }
+
+  // Read last + history
+  async function fetchJSON(url){
+    const r = await fetch(url);
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    return await r.json();
+  }
+
+  function updateLast(d){
+    // fields from ESP32 payload
+    el("airT").textContent  = fmt(d.air_temp,1);
+    el("airRH").textContent = fmt(d.air_rh,1);
+    el("soil").textContent  = fmt(d.soil_pct,1);
+
+    el("lux").textContent   = (d.lux ?? "--");
+    el("ppfd").textContent  = fmt(d.ppfd,1);
+
+    el("wind").textContent  = fmt(d.wind_ms,2);
+    el("press").textContent = fmt(d.pressure_hpa,1);
+
+    el("vpd").textContent   = fmt(d.vpd,2);
+    el("edi").textContent   = fmt(d.edi,2);
+
+    setPumpBadge(d.pump || "OFF");
+
+    // timestamp label (we only have millis ts in your code)
+    el("timeLbl").textContent = "Last update: just now";
+  }
+
+  function updateCharts(list){
+    const labels = list.map((_,i)=> String(i+1));
+
+    const map = (k)=> list.map(x => (x && x[k] !== undefined) ? Number(x[k]) : null);
+
+    chTemp.data.labels = labels;
+    chSoil.data.labels = labels;
+    chWind.data.labels = labels;
+    chPress.data.labels= labels;
+    chEdi.data.labels  = labels;
+    chPpfd.data.labels = labels;
+
+    chTemp.data.datasets[0].data = map("air_temp");
+    chSoil.data.datasets[0].data = map("soil_pct");
+    chWind.data.datasets[0].data = map("wind_ms");
+    chPress.data.datasets[0].data= map("pressure_hpa");
+    chEdi.data.datasets[0].data  = map("edi");
+    chPpfd.data.datasets[0].data = map("ppfd");
+
+    chTemp.update(); chSoil.update(); chWind.update();
+    chPress.update(); chEdi.update(); chPpfd.update();
+  }
+
+  async function tick(force=false){
+    try{
+      const last = await fetchJSON(`${DB}/last.json${READ_QUERY}`);
+      if(last){
+        updateLast(last);
+        setOnline(true, "Live");
+      }else{
+        setOnline(false, "No data yet");
+      }
+
+      // history is an object if you use POST push
+      const histObj = await fetchJSON(`${DB}/history.json?orderBy="$key"&limitToLast=30${READ_QUERY ? "&"+READ_QUERY.slice(1) : ""}`);
+      if(histObj){
+        const keys = Object.keys(histObj).sort((a,b)=>a.localeCompare(b));
+        const list = keys.map(k => histObj[k]);
+        updateCharts(list);
+      }
+    }catch(e){
+      console.log(e);
+      setOnline(false, "Offline / fetch error");
+    }
+  }
+
+  setInterval(()=>tick(false), 3000);
+  tick(true);
+</script>
 </body>
 </html>
