@@ -139,3 +139,39 @@ async function loop(){
 
 loop();
 setInterval(loop, POLL_MS);
+const DB_URL = "https://smart-irrigation-site-90e51-default-rtdb.firebaseio.com/last.json";
+
+async function loadLast() {
+  try {
+    const r = await fetch(DB_URL);
+    const d = await r.json();
+
+    // بدلّي IDs هنا حسب HTML ديالك
+    set("air_temp", d.air_temp);
+    set("air_rh", d.air_rh);
+    set("bmp_temp", d.bmp_temp);
+    set("soil_pct", d.soil_pct);
+    set("lux", d.lux);
+    set("ppfd", d.ppfd);
+    set("pressure_hpa", d.pressure_hpa);
+    set("pump", d.pump);
+    set("irrig_ms", d.irrig_ms);
+    set("crop", d.crop);
+
+    set("last_update", new Date().toLocaleString());
+    set("status", "Connected ✅");
+  } catch (e) {
+    console.error(e);
+    set("status", "Error ❌");
+  }
+}
+
+function set(id, v) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = (v === undefined || v === null) ? "--" : v;
+}
+
+loadLast();
+setInterval(loadLast, 2000);
+
