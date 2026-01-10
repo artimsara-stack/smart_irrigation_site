@@ -342,7 +342,7 @@
 
   async function tick(){
     try{
-      const last = await fetchJSON(`${DB}/last.json${READ_QUERY}`);
+      const last = await fetchJSON(`${DB}/live.json${READ_QUERY}`);
       if(last){
         updateLast(last);
         setOnline(true, "Live");
