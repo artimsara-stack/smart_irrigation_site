@@ -1,6 +1,6 @@
 // ===== EMQX CONFIG =====
 const MQTT_HOST = "wss://n1122166.ala.eu-central-1.emqxsl.com:8084/mqtt";
-const MQTT_USER = "irrigation";      // بدلها
+const MQTT_USER = "sara";      // بدلها
 const MQTT_PASS = "12345678";        // بدلها
 const MQTT_TOPIC = "smart/irrigation";  // نفس التوبيك لي كيستعمل ESP32
 
