@@ -139,7 +139,10 @@ chTemp.update();chSoil.update();chWind.update();chPress.update();
 }
 
 /* ✅ MQTT CONNECTION */
-const client=mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
+const client = mqtt.connect("wss://n1122166.ala.eu-central-1.emqxsl.com:8084/mqtt", {
+  username: "sara",
+  password: "12345678"
+});
 
 client.on("connect",()=>{
 setOnline(true,"MQTT Connected");
