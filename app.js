@@ -1,105 +1,41 @@
-const MQTT_URL="wss://n1122166.ala.eu-central-1.emqxsl.com:8084/mqtt";
-const MQTT_USER="sara";
-const MQTT_PASS="12345678";
-const MQTT_TOPIC="smart/irrigation";
+// ===== MQTT CONFIG =====
+const brokerUrl = "wss://n1122166.ala.eu-central-1.emqxsl.com:8084/mqtt";
+const options = {
+  username: "sara",
+  password: "12345678",
+  clean: true,
+  connectTimeout: 4000,
+};
 
-const $=id=>document.getElementById(id);
+const topic = "smartirrigation/live";
 
-function setOnline(ok,msg){
-  const dot=$("dot");
-  dot.classList.remove("ok","no");
-  dot.classList.add(ok?"ok":"no");
-  $("statusTxt").textContent=msg;
-}
+const client = mqtt.connect(brokerUrl, options);
 
-function setPump(state){
-  const badge=$("pumpBadge");
-  const txt=$("pumpTxt");
-  if(String(state).toUpperCase()==="ON"){
-    badge.classList.add("on");
-    badge.classList.remove("off");
-    txt.textContent="PUMP ON";
-  }else{
-    badge.classList.add("off");
-    badge.classList.remove("on");
-    txt.textContent="PUMP OFF";
-  }
-}
-
-function makeChart(id){
-  return new Chart($(id),{
-    type:"line",
-    data:{labels:[],datasets:[{data:[]}]},
-    options:{responsive:true,animation:false}
-  });
-}
-
-const chT=makeChart("cTemp");
-const chH=makeChart("cHum");
-const chS=makeChart("cSoil");
-const chP=makeChart("cPump");
-
-const hist=[];
-
-function updateCharts(){
-  const labels=hist.map((_,i)=>i+1);
-  [chT,chH,chS,chP].forEach(ch=>ch.data.labels=labels);
-
-  chT.data.datasets[0].data=hist.map(x=>x.t);
-  chH.data.datasets[0].data=hist.map(x=>x.h);
-  chS.data.datasets[0].data=hist.map(x=>x.s);
-  chP.data.datasets[0].data=hist.map(x=>x.p);
-
-  chT.update();chH.update();chS.update();chP.update();
-}
-
-let client;
-
-function connectMQTT(){
-  setOnline(false,"Connecting...");
-  client=mqtt.connect(MQTT_URL,{
-    username:MQTT_USER,
-    password:MQTT_PASS,
-    reconnectPeriod:3000
-  });
-
-  client.on("connect",()=>{
-    setOnline(true,"MQTT Connected");
-    client.subscribe(MQTT_TOPIC);
-  });
-
-  client.on("message",(topic,msg)=>{
-    if(topic!==MQTT_TOPIC)return;
-
-    const d=JSON.parse(msg.toString());
-
-    $("airT").textContent=d.temperature??"--";
-    $("airRH").textContent=d.humidity??"--";
-    $("soil").textContent=d.soil_adc??"--";
-    setPump(d.pump);
-
-    $("timeLbl").textContent="Last update: "+new Date().toLocaleTimeString();
-
-    hist.push({
-      t:Number(d.temperature),
-      h:Number(d.humidity),
-      s:Number(d.soil_adc),
-      p:String(d.pump).toUpperCase()==="ON"?1:0
-    });
-
-    if(hist.length>30)hist.shift();
-    updateCharts();
-  });
-
-  client.on("reconnect",()=>setOnline(false,"Reconnecting..."));
-  client.on("close",()=>setOnline(false,"Disconnected"));
-  client.on("error",()=>setOnline(false,"Error"));
-}
-
-$("reconnectBtn").addEventListener("click",connectMQTT);
-$("themeBtn").addEventListener("click",()=>{
-  document.body.dataset.theme=
-  document.body.dataset.theme==="dark"?"light":"dark";
+client.on("connect", () => {
+  setConnected(true, "EMQX Connected ✅");
+  client.subscribe(topic);
 });
 
-connectMQTT();
+client.on("error", () => {
+  setConnected(false, "MQTT Error");
+});
+
+client.on("message", (topic, message) => {
+  const d = JSON.parse(message.toString());
+
+  const air_temp = d.air_temp;
+  const air_rh = d.air_rh;
+  const soil_pct = d.soil_pct;
+  const lux = d.lux;
+  const ppfd = d.ppfd;
+  const pump = d.pump;
+
+  setText(el.airTemp, fmtNumber(air_temp, 1));
+  setText(el.airRH, fmtNumber(air_rh, 1));
+  setText(el.soil, fmtNumber(soil_pct, 1));
+  setText(el.lux, lux);
+  setText(el.ppfd, fmtNumber(ppfd, 2));
+  setText(el.pumpPeriod, pump);
+
+  setText(el.lastUpdate, new Date().toLocaleString());
+});
