@@ -1,174 +1,85 @@
 <!doctype html>
 <html lang="fr">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Smart Irrigation Dashboard</title>
 
+<!-- Charts -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- MQTT -->
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
-<style>
-/* ✅ نفس التصميم ديالك 100% */
-:root{
---bg:#0b1220;--card:#121b2f;--text:#e8eefc;--muted:#9fb0d0;
---border:rgba(255,255,255,.08);--good:#22c55e;--bad:#ef4444;
---warn:#f59e0b;--chip:#1f2a44;--shadow:0 14px 30px rgba(0,0,0,.35);
---radius:16px;}
-[data-theme="light"]{
---bg:#f6f7fb;--card:#ffffff;--text:#0b1220;
---muted:#55627a;--border:rgba(10,15,30,.10);
---chip:#eef2ff;--shadow:0 14px 30px rgba(20,30,60,.12);}
-*{box-sizing:border-box}
-body{margin:0;font-family:system-ui;
-background:radial-gradient(1200px 600px at 20% 0%, rgba(99,102,241,.20), transparent 60%),
-radial-gradient(900px 500px at 90% 20%, rgba(34,197,94,.12), transparent 55%),var(--bg);
-color:var(--text);}
-.container{max-width:1200px;margin:0 auto;padding:18px;}
-header{display:flex;justify-content:space-between;align-items:center;padding:14px 0;}
-.logo{width:40px;height:40px;border-radius:12px;
-background:linear-gradient(135deg, rgba(99,102,241,.95), rgba(34,197,94,.85));}
-h1{font-size:18px;margin:0}
-.subtitle{font-size:12px;color:var(--muted);}
-.actions{display:flex;gap:10px;align-items:center}
-.pill{padding:8px 10px;border-radius:999px;background:var(--chip);
-border:1px solid var(--border);color:var(--muted);font-size:12px;display:flex;gap:8px;}
-.dot{width:8px;height:8px;border-radius:999px;background:var(--warn)}
-.dot.ok{background:var(--good)}.dot.no{background:var(--bad)}
-.btn{border:1px solid var(--border);background:rgba(255,255,255,.04);
-color:var(--text);padding:10px 12px;border-radius:12px;cursor:pointer;}
-.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;}
-.card{background:rgba(255,255,255,.04);border:1px solid var(--border);
-border-radius:var(--radius);padding:14px;}
-.kpi{grid-column:span 3;}
-.kpi .value{font-size:26px;font-weight:700}
-.wide{grid-column:span 6;}
-.chartCard{grid-column:span 6;min-height:320px;}
-.chartCard canvas{height:260px!important;}
-@media(max-width:1000px){
-.kpi{grid-column:span 6;}
-.chartCard,.wide{grid-column:span 12;}
-}
-</style>
+<!-- CSS -->
+<link rel="stylesheet" href="style.css"/>
 </head>
 
 <body data-theme="dark">
+
 <div class="container">
 
 <header>
-<div style="display:flex;gap:12px;align-items:center">
-<div class="logo"></div>
-<div>
-<h1>Smart Irrigation — Dashboard</h1>
-<div class="subtitle">ESP32 → MQTT → GitHub Pages</div>
-</div>
-</div>
+  <div class="title">
+    <div class="logo"></div>
+    <div>
+      <h1>Smart Irrigation — Dashboard</h1>
+      <div class="subtitle">ESP32 → EMQX Cloud → GitHub Pages</div>
+    </div>
+  </div>
 
-<div class="actions">
-<div class="pill"><span class="dot" id="dot"></span><span id="statusTxt">Connecting...</span></div>
-<button class="btn" onclick="toggleTheme()">🌓 Theme</button>
-</div>
+  <div class="actions">
+    <div class="pill">
+      <span class="dot" id="dot"></span>
+      <span id="statusTxt">Connecting MQTT…</span>
+    </div>
+    <button class="btn" id="themeBtn">🌓 Theme</button>
+    <button class="btn" id="reconnectBtn">🔌 Reconnect</button>
+  </div>
 </header>
 
 <section class="grid">
-<div class="card kpi"><div>Air Temp</div><div class="value"><span id="airT">--</span> °C</div></div>
-<div class="card kpi"><div>Air RH</div><div class="value"><span id="airRH">--</span> %</div></div>
-<div class="card kpi"><div>Soil</div><div class="value"><span id="soil">--</span> %</div></div>
-<div class="card kpi"><div>Wind</div><div class="value"><span id="wind">--</span> m/s</div></div>
-<div class="card kpi"><div>Pressure</div><div class="value"><span id="press">--</span> hPa</div></div>
-<div class="card kpi"><div>EDI</div><div class="value"><span id="edi">--</span></div></div>
 
-<div class="card wide">
-<div style="margin-bottom:10px;">Pump Status:</div>
-<div id="pumpTxt" style="font-weight:700;font-size:18px;">--</div>
-</div>
-</section>
-
-<section class="grid" style="margin-top:12px;">
-<div class="card chartCard"><canvas id="cTemp"></canvas></div>
-<div class="card chartCard"><canvas id="cSoil"></canvas></div>
-<div class="card chartCard"><canvas id="cWind"></canvas></div>
-<div class="card chartCard"><canvas id="cPress"></canvas></div>
-</section>
-
+<div class="card kpi">
+  <div class="label">Air Temperature</div>
+  <div class="value"><span id="airT">--</span><span class="unit">°C</span></div>
+  <div class="sub" id="timeLbl">Last update: --</div>
 </div>
 
-<script>
-const el=id=>document.getElementById(id);
+<div class="card kpi">
+  <div class="label">Air Humidity</div>
+  <div class="value"><span id="airRH">--</span><span class="unit">%</span></div>
+  <div class="sub">DHT22</div>
+</div>
 
-function toggleTheme(){
-document.body.dataset.theme=
-document.body.dataset.theme==="dark"?"light":"dark";
-}
+<div class="card kpi">
+  <div class="label">Soil ADC</div>
+  <div class="value"><span id="soil">--</span><span class="unit">adc</span></div>
+  <div class="sub">Raw analog value</div>
+</div>
 
-function setOnline(ok,msg){
-const dot=el("dot");
-dot.classList.remove("ok","no");
-dot.classList.add(ok?"ok":"no");
-el("statusTxt").textContent=msg;
-}
+<div class="card kpi">
+  <div class="label">Pump</div>
+  <div class="value" style="font-size:18px;">
+    <span class="badge" id="pumpBadge">
+      <span class="bDot"></span>
+      <span id="pumpTxt">PUMP --</span>
+    </span>
+  </div>
+  <div class="sub">From ESP32</div>
+</div>
 
-function makeChart(id,label){
-return new Chart(el(id),{
-type:"line",
-data:{labels:[],datasets:[{label,data:[]}]},
-options:{responsive:true,animation:false}
-});
-}
+</section>
 
-const chTemp=makeChart("cTemp","Temp");
-const chSoil=makeChart("cSoil","Soil");
-const chWind=makeChart("cWind","Wind");
-const chPress=makeChart("cPress","Pressure");
+<section class="charts">
+  <div class="card chartCard"><canvas id="cTemp"></canvas></div>
+  <div class="card chartCard"><canvas id="cHum"></canvas></div>
+  <div class="card chartCard"><canvas id="cSoil"></canvas></div>
+  <div class="card chartCard"><canvas id="cPump"></canvas></div>
+</section>
 
-let historyBuffer=[];
+</div>
 
-function updateCharts(){
-const labels=historyBuffer.map((_,i)=>i+1);
-chTemp.data.labels=labels;
-chSoil.data.labels=labels;
-chWind.data.labels=labels;
-chPress.data.labels=labels;
-
-chTemp.data.datasets[0].data=historyBuffer.map(x=>x.air_temp);
-chSoil.data.datasets[0].data=historyBuffer.map(x=>x.soil);
-chWind.data.datasets[0].data=historyBuffer.map(x=>x.wind);
-chPress.data.datasets[0].data=historyBuffer.map(x=>x.pressure);
-
-chTemp.update();chSoil.update();chWind.update();chPress.update();
-}
-
-/* ✅ MQTT CONNECTION */
-const client = mqtt.connect("wss://n1122166.ala.eu-central-1.emqxsl.com:8084/mqtt", {
-  username: "sara",
-  password: "12345678"
-});
-
-client.on("connect",()=>{
-setOnline(true,"MQTT Connected");
-client.subscribe("smart_irrigation/live");
-});
-
-client.on("message",(topic,message)=>{
-const data=JSON.parse(message.toString());
-
-el("airT").textContent=data.air_temp ?? "--";
-el("airRH").textContent=data.air_rh ?? "--";
-el("soil").textContent=data.soil ?? "--";
-el("wind").textContent=data.wind ?? "--";
-el("press").textContent=data.pressure ?? "--";
-el("edi").textContent=data.edi ?? "--";
-el("pumpTxt").textContent=data.pump ?? "--";
-
-historyBuffer.push(data);
-if(historyBuffer.length>30)historyBuffer.shift();
-updateCharts();
-});
-
-client.on("error",()=>{
-setOnline(false,"MQTT Error");
-});
-</script>
-
+<script src="app.js"></script>
 </body>
 </html>
