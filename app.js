@@ -1,25 +1,31 @@
 /* =========================================================
-   Smart Irrigation Dashboard — MQTT (EMQX)  ✅
-   - Robust JSON parsing (fix nan/NaN => null)
-   - Updates KPIs + Pump badge + Message counter + Topic label
-   - Auto-creates charts if canvases exist
+   Smart Irrigation Dashboard — MQTT (EMQX)
+   Works with your HTML IDs:
+   KPIs: airT airRH soil soilUnit soilSub ppfd lux wind press vpd edi ediSub
+        pumpBadge dayNight topicLbl msgCount timeLbl dot statusTxt
+   Charts canvases: cTemp cSoil cWind cPress cEdi cPpfd
+   Buttons: themeBtn clearBtn
    ========================================================= */
 
 // ===================== MQTT CONFIG =====================
 const MQTT_HOST  = "wss://n1122166.ala.eu-central-1.emqxsl.com:8084/mqtt";
 const MQTT_USER  = "sara";
 const MQTT_PASS  = "12345678";
-
-// نفس اللي فـ ESP32
-const MQTT_TOPIC = "smart/irrigation";
+const MQTT_TOPIC = "smart/irrigation"; // نفس اللي ف ESP32
 
 // ===================== DOM HELPERS =====================
 const $ = (id) => document.getElementById(id);
 
 function setText(id, v){
-  const node = $(id);
-  if (!node) return;
-  node.textContent = (v === undefined || v === null || v === "") ? "--" : String(v);
+  const n = $(id);
+  if (!n) return;
+  n.textContent = (v === undefined || v === null || v === "") ? "--" : String(v);
+}
+
+function fmt(v, n=1){
+  const x = Number(v);
+  if (v === null || v === undefined || Number.isNaN(x)) return "--";
+  return x.toFixed(n);
 }
 
 function setOnline(ok, msg){
@@ -29,12 +35,6 @@ function setOnline(ok, msg){
     dot.classList.add(ok ? "ok" : "no");
   }
   setText("statusTxt", msg);
-}
-
-function fmt(v, n=1){
-  const x = Number(v);
-  if (v === null || v === undefined || Number.isNaN(x)) return "--";
-  return x.toFixed(n);
 }
 
 function setPumpBadge(state){
@@ -47,12 +47,10 @@ function setPumpBadge(state){
 }
 
 // ===================== SAFE JSON PARSE =====================
-// EMQX كيبان فيه "lux":nan  => هذا INVALID JSON
-// كنحوّلو nan/NaN/Infinity/-Infinity لـ null باش JSON.parse يخدم
+// Fix invalid JSON like: "lux":nan  -> "lux":null
 function safeParse(raw){
   if (typeof raw !== "string") return null;
 
-  // replace :nan  / :NaN / :Infinity / :-Infinity  => :null
   const cleaned = raw
     .replace(/:\s*nan/gi, ":null")
     .replace(/:\s*NaN/g, ":null")
@@ -61,48 +59,58 @@ function safeParse(raw){
 
   try {
     return JSON.parse(cleaned);
-  } catch (e) {
-    console.log("❌ JSON parse error. RAW=", raw);
-    console.log("❌ JSON parse error. CLEANED=", cleaned);
+  } catch(e){
+    console.log("❌ JSON parse failed");
+    console.log("RAW    =", raw);
+    console.log("CLEANED=", cleaned);
     console.log(e);
     return null;
   }
 }
 
-// ===================== CHARTS (optional) =====================
+// ===================== CHARTS =====================
 const MAX_POINTS = 40;
+const charts = {}; // { key: { chart, labels, data } }
 
-function pushSeries(series, label, value){
-  series.labels.push(label);
-  series.values.push(value);
-  while(series.labels.length > MAX_POINTS){
-    series.labels.shift();
-    series.values.shift();
+function addPoint(obj, label, value){
+  obj.labels.push(label);
+  obj.data.push(value);
+
+  while(obj.labels.length > MAX_POINTS){
+    obj.labels.shift();
+    obj.data.shift();
   }
+  obj.chart.update();
 }
 
-function makeChart(canvasId, label){
+function makeLineChart(canvasId, label){
   const canvas = document.getElementById(canvasId);
   if (!canvas || !window.Chart) return null;
 
-  const ctx = canvas.getContext("2d");
-  const series = { labels: [], values: [] };
+  const labels = [];
+  const data = [];
 
-  const chart = new Chart(ctx, {
+  const chart = new Chart(canvas.getContext("2d"), {
     type: "line",
     data: {
-      labels: series.labels,
+      labels,
       datasets: [{
         label,
-        data: series.values,
+        data,
         tension: 0.25,
-        pointRadius: 2
+        pointRadius: 2,
+        pointHoverRadius: 3,
+        borderWidth: 2
       }]
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       animation: false,
-      plugins: { legend: { display: true } },
+      plugins: {
+        legend: { display: true },
+        tooltip: { intersect: false, mode: "index" }
+      },
       scales: {
         x: { ticks: { maxTicksLimit: 8 } },
         y: { beginAtZero: false }
@@ -110,27 +118,53 @@ function makeChart(canvasId, label){
     }
   });
 
-  return { chart, series };
+  return { chart, labels, data };
 }
 
-// خزّنا charts حسب IDs اللي كاينين فـ HTML ديالك (إلا ماكانوش كيتجاهل)
-const charts = {};
-
-// جرّب هاد الأسماء (خلي اللي عندك)
 function initCharts(){
-  charts.temp   = makeChart("tempChart",   "Air Temperature (°C)");
-  charts.soil   = makeChart("soilChart",   "Soil (%) / ADC");
-  charts.wind   = makeChart("windChart",   "Wind (m/s)");
-  charts.press  = makeChart("pressChart",  "Pressure (hPa)");
-  charts.ppfd   = makeChart("ppfdChart",   "PPFD");
-  charts.vpd    = makeChart("vpdChart",    "VPD (kPa)");
-  charts.et0    = makeChart("et0Chart",    "ET0 rate (mm/h)");
+  // canvases IDs from your HTML
+  charts.temp  = makeLineChart("cTemp",  "Air Temperature (°C)");
+  charts.soil  = makeLineChart("cSoil",  "Soil (%) / ADC");
+  charts.wind  = makeLineChart("cWind",  "Wind (m/s)");
+  charts.press = makeLineChart("cPress", "Pressure (hPa)");
+  charts.edi   = makeLineChart("cEdi",   "EDI / ET0");
+  charts.ppfd  = makeLineChart("cPpfd",  "PPFD");
 }
 
-function updateChart(ref, label, value){
-  if (!ref || value === null || value === undefined || Number.isNaN(Number(value))) return;
-  pushSeries(ref.series, label, Number(value));
-  ref.chart.update();
+function updateChart(ref, label, v){
+  if (!ref) return;
+  const x = Number(v);
+  if (v === null || v === undefined || Number.isNaN(x)) return;
+  addPoint(ref, label, x);
+}
+
+function clearCharts(){
+  Object.values(charts).forEach(ref => {
+    if (!ref) return;
+    ref.labels.length = 0;
+    ref.data.length = 0;
+    ref.chart.update();
+  });
+}
+
+// ===================== THEME + CLEAR =====================
+function toggleTheme(){
+  const root = document.documentElement;
+  const cur = root.getAttribute("data-theme");
+  root.setAttribute("data-theme", cur === "light" ? "dark" : "light");
+}
+
+function hookButtons(){
+  const themeBtn = $("themeBtn");
+  const clearBtn = $("clearBtn");
+
+  if (themeBtn) themeBtn.addEventListener("click", toggleTheme);
+
+  if (clearBtn) clearBtn.addEventListener("click", () => {
+    msgCount = 0;
+    setText("msgCount", msgCount);
+    clearCharts();
+  });
 }
 
 // ===================== MQTT CONNECT =====================
@@ -143,22 +177,22 @@ const client = mqtt.connect(MQTT_HOST, {
   password: MQTT_PASS,
   clientId: "dash_" + Math.random().toString(16).slice(2),
   clean: true,
-  connectTimeout: 7000,
+  connectTimeout: 8000,
   reconnectPeriod: 2500,
 });
 
 client.on("connect", () => {
   setOnline(true, "MQTT Connected ✅");
 
-  // باش تعرفي واش كيوصلو messages: كنكتب topic فالكارت
-  setText("mqttTopic", MQTT_TOPIC);
-  setText("msgsCount", msgCount);
+  // show topic + msg count in UI
+  setText("topicLbl", MQTT_TOPIC);
+  setText("msgCount", msgCount);
 
-  // Subscribe للtopic + wildcard احتياطاً
+  // subscribe exact + wildcard
   client.subscribe(MQTT_TOPIC, { qos: 0 }, (err) => {
     if (err) setOnline(false, "Subscribe error ❌");
   });
-  client.subscribe(MQTT_TOPIC + "/#", { qos: 0 }, () => {}); // safe extra
+  client.subscribe(MQTT_TOPIC + "/#", { qos: 0 }, () => {});
 });
 
 client.on("reconnect", () => setOnline(false, "Reconnecting..."));
@@ -168,83 +202,81 @@ client.on("error", (e) => {
   setOnline(false, "MQTT Error");
 });
 
+// ===================== BOOT =====================
 window.addEventListener("load", () => {
+  // default theme
+  if (!document.documentElement.getAttribute("data-theme")){
+    document.documentElement.setAttribute("data-theme", "dark");
+  }
   initCharts();
+  hookButtons();
 });
 
 // ===================== MESSAGE HANDLER =====================
 client.on("message", (topic, message) => {
   const raw = message.toString();
 
-  // Debug: خليه خدام حتى يبان لك واش كيوصلو messages
-  // فتح DevTools Console وغادي تشوف هاد السطور
+  // Debug (إلا بغيتي تشوف واش كيوصل message فالبراوزر)
+  // فتح Console: (Mac) Cmd+Option+I ثم Console
   console.log("📩 TOPIC:", topic);
   console.log("📩 RAW:", raw);
 
   const d = safeParse(raw);
-  if (!d) return; // parse فشل
+  if (!d) return;
 
   msgCount++;
-  setText("msgsCount", msgCount);
-  setText("mqttTopic", topic);
+  setText("msgCount", msgCount);
+  setText("topicLbl", topic);
 
-  // ====== Fields (مطابقة للي كيبعث ESP32 ديالك) ======
-  // من الصورة ديال EMQX كيبانو: air_temp, air_rh, soil_pct, lux, ppfd, pressure_hpa, wind_ms, vpd, et0_rate_mm_h, pump...
-  const airT     = d.air_temp ?? d.temperature;
-  const airRH    = d.air_rh ?? d.humidity;
+  // ====== Fields from ESP32 (حسب اللي بان ف EMQX) ======
+  const airT     = d.air_temp;
+  const airRH    = d.air_rh;
   const soilPct  = d.soil_pct;
-  const soilADC  = d.soil_adc ?? d.soilADC ?? d.soil_adc_raw; // إلا عندك نسخة ADC
   const lux      = d.lux;
   const ppfd     = d.ppfd;
-  const pressHpa = d.pressure_hpa ?? d.pressure_hpa ?? d.pressure;
-  const windMs   = d.wind_ms ?? d.wind;
+  const pressHpa = d.pressure_hpa;
+  const windMs   = d.wind_ms;
   const vpdKpa   = d.vpd;
-  const et0Rate  = d.et0_rate_mm_h;
-  const et0Daily = d.et0_daily_est_mm;
+  const et0Rate  = d.et0_rate_mm_h;      // نستعملها ف EDI card
   const pump     = d.pump ?? "OFF";
+  const isDay    = d.is_day;
 
-  // ====== Update KPIs (استعمل نفس IDs اللي فـ HTML ديالك) ======
-  // إذا شي ID ما كاينش، setText كتتجاهلو بلا مشاكل
+  // ====== KPIs ======
   setText("airT",  fmt(airT, 1));
   setText("airRH", fmt(airRH, 1));
 
-  // Soil: إلا جا ADC كنوريه، إلا لا كنوري %
-  if (soilADC !== undefined && soilADC !== null && !Number.isNaN(Number(soilADC))){
-    setText("soil", Math.round(Number(soilADC)));
-  } else {
-    setText("soil", fmt(soilPct, 1));
-  }
+  // Soil card: % (monitor)
+  setText("soil", fmt(soilPct, 1));
+  setText("soilUnit", "%");
+  setText("soilSub", "Not controlling");
 
-  setText("lux",   (lux === null || lux === undefined || Number.isNaN(Number(lux))) ? "--" : Math.round(Number(lux)));
-  setText("ppfd",  fmt(ppfd, 2));
+  // Light
+  setText("ppfd", fmt(ppfd, 2));
+  setText("lux",  (lux === null || lux === undefined || Number.isNaN(Number(lux))) ? "--" : Math.round(Number(lux)));
+
+  // Wind / Pressure / VPD
   setText("wind",  fmt(windMs, 2));
   setText("press", fmt(pressHpa, 1));
   setText("vpd",   fmt(vpdKpa, 2));
 
-  // EDI/ETO: عندك فـ ESP32 ما كاينش edi، ولكن كاين et0_rate و et0_daily
-  // نخلي "edi" يعرض ET0_rate باش ماتبانش خاوية
+  // EDI/ET0 card: نخليها ET0_rate باش ما تبقاش خاوية
   setText("edi", fmt(et0Rate, 3));
+  setText("ediSub", "index");
 
-  // Pump badge
+  // Pump
   setPumpBadge(pump);
-  setText("pumpTxt", String(pump).toUpperCase()); // إذا عندك هذا الID
-  setText("pump", String(pump).toUpperCase());    // إذا عندك هذا الID
+  setText("dayNight", (isDay === 1 || isDay === "1") ? "DAY ☀️" : "NIGHT 🌙");
 
   // Last update
-  setText("lastUpdate", new Date().toLocaleString());
+  setText("timeLbl", "Last update: " + new Date().toLocaleTimeString());
 
-  // ====== Charts (إذا كانو canvases موجودين) ======
+  // ====== Charts ======
   const tLabel = new Date().toLocaleTimeString();
 
   updateChart(charts.temp,  tLabel, airT);
-  updateChart(charts.soil,  tLabel, (soilADC ?? soilPct));
+  updateChart(charts.soil,  tLabel, soilPct);
   updateChart(charts.wind,  tLabel, windMs);
   updateChart(charts.press, tLabel, pressHpa);
+  updateChart(charts.edi,   tLabel, et0Rate);
   updateChart(charts.ppfd,  tLabel, ppfd);
-  updateChart(charts.vpd,   tLabel, vpdKpa);
-  updateChart(charts.et0,   tLabel, et0Rate);
-
-  // Extra display if you have these IDs
-  setText("et0Rate", fmt(et0Rate, 4));
-  setText("et0Daily", fmt(et0Daily, 2));
 });
