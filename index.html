@@ -1,78 +1,83 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Smart Irrigation Dashboard</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Smart Irrigation — Dashboard</title>
 
-  <!-- CSS ديالك -->
-  <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css">
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- MQTT.js -->
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 
 <body>
 <div class="container">
 
 <header>
-  <div class="title">
-    <div class="logo"></div>
-    <div>
-      <h2>Smart Irrigation</h2>
-      <div class="subtitle">ESP32 → MQTT → EMQX</div>
-    </div>
+  <div>
+    <h1>Smart Irrigation — Dashboard</h1>
+    <div class="subtitle">ESP32 → MQTT → EMQX → GitHub Pages</div>
   </div>
 
   <div class="actions">
-    <div class="pill">
+    <div class="live">
       <span class="dot" id="dot"></span>
       <span id="statusTxt">Connecting...</span>
     </div>
   </div>
 </header>
 
-<!-- KPIs -->
 <div class="grid">
 
-  <div class="card kpi">
-    <div class="label">Air Temperature</div>
-    <div class="value"><span id="airT">--</span> <span class="unit">°C</span></div>
+  <div class="card">
+    <h3>Air Temperature</h3>
+    <div class="value"><span id="airT">--</span> °C</div>
   </div>
 
-  <div class="card kpi">
-    <div class="label">Air Humidity</div>
-    <div class="value"><span id="airRH">--</span> <span class="unit">%</span></div>
+  <div class="card">
+    <h3>Air Humidity</h3>
+    <div class="value"><span id="airRH">--</span> %</div>
   </div>
 
-  <div class="card kpi">
-    <div class="label">Soil ADC</div>
-    <div class="value"><span id="soil">--</span></div>
+  <div class="card">
+    <h3>Soil Moisture</h3>
+    <div class="value"><span id="soil">--</span> %</div>
   </div>
 
-  <div class="card kpi">
-    <div class="label">Pump</div>
-    <div class="value">
-      <span id="pumpBadge" class="badge off">OFF</span>
+  <div class="card">
+    <h3>Light (PPFD)</h3>
+    <div class="value"><span id="ppfd">--</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Wind Speed</h3>
+    <div class="value"><span id="wind">--</span> m/s</div>
+  </div>
+
+  <div class="card">
+    <h3>Pressure</h3>
+    <div class="value"><span id="pressure">--</span> hPa</div>
+  </div>
+
+  <div class="card control">
+    <h3>Control Summary</h3>
+    <div id="pumpBadge" class="pump off">PUMP OFF</div>
+    <div class="mini">
+      VPD: <span id="vpd">--</span> kPa
+    </div>
+    <div class="mini">
+      ET0: <span id="et0">--</span> mm/h
     </div>
   </div>
 
 </div>
 
-<!-- Charts -->
 <div class="charts">
-
-  <div class="card chartCard">
-    <canvas id="tempChart"></canvas>
-  </div>
-
-  <div class="card chartCard">
-    <canvas id="soilChart"></canvas>
-  </div>
-
+  <div class="chartCard"><canvas id="tempChart"></canvas></div>
+  <div class="chartCard"><canvas id="soilChart"></canvas></div>
+  <div class="chartCard"><canvas id="windChart"></canvas></div>
+  <div class="chartCard"><canvas id="pressChart"></canvas></div>
 </div>
 
 </div>
