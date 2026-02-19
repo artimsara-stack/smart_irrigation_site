@@ -1,34 +1,26 @@
 /* =========================================================
-   Smart Irrigation Dashboard — MQTT (EMQX)  ✅
-   - Robust JSON parsing (fix nan/NaN => null)
-   - Updates KPIs + Pump badge + Message counter + Topic label
-   - Auto-creates charts if canvases exist
-   ========================================================= */
+   SMART IRRIGATION — DASHBOARD (MQTT + CHARTS)
+   Works with ESP32 publishing JSON on topic: smart/irrigation
+   Requires: mqtt.min.js + chart.js loaded in HTML
+========================================================= */
 
 // ===================== MQTT CONFIG =====================
 const MQTT_HOST  = "wss://n1122166.ala.eu-central-1.emqxsl.com:8084/mqtt";
 const MQTT_USER  = "sara";
 const MQTT_PASS  = "12345678";
+const MQTT_TOPIC = "smart/irrigation"; // EXACT topic (no /# here)
 
-// نفس اللي فـ ESP32
-const MQTT_TOPIC = "smart/irrigation";
-
-// ===================== DOM HELPERS =====================
-const $ = (id) => document.getElementById(id);
-
-function setText(id, v){
-  const node = $(id);
-  if (!node) return;
-  node.textContent = (v === undefined || v === null || v === "") ? "--" : String(v);
-}
+// ===================== HELPERS =====================
+const el = (id) => document.getElementById(id);
 
 function setOnline(ok, msg){
-  const dot = $("dot");
+  const dot = el("dot");
+  const txt = el("statusTxt");
   if (dot){
     dot.classList.remove("ok","no");
     dot.classList.add(ok ? "ok" : "no");
   }
-  setText("statusTxt", msg);
+  if (txt) txt.textContent = msg;
 }
 
 function fmt(v, n=1){
@@ -37,214 +29,214 @@ function fmt(v, n=1){
   return x.toFixed(n);
 }
 
+function setText(id, value){
+  const node = el(id);
+  if (!node) return;
+  node.textContent = value;
+}
+
 function setPumpBadge(state){
-  const b = $("pumpBadge");
+  const b = el("pumpBadge");
   if (!b) return;
-  const isOn = String(state || "").toUpperCase() === "ON";
+  const isOn = String(state).toUpperCase() === "ON";
   b.textContent = isOn ? "ON" : "OFF";
   b.classList.toggle("on", isOn);
   b.classList.toggle("off", !isOn);
 }
 
-// ===================== SAFE JSON PARSE =====================
-// EMQX كيبان فيه "lux":nan  => هذا INVALID JSON
-// كنحوّلو nan/NaN/Infinity/-Infinity لـ null باش JSON.parse يخدم
-function safeParse(raw){
-  if (typeof raw !== "string") return null;
+// ===================== CHARTS =====================
+const maxPoints = 40;
+const charts = {}; // {key: Chart}
 
-  // replace :nan  / :NaN / :Infinity / :-Infinity  => :null
-  const cleaned = raw
-    .replace(/:\s*nan/gi, ":null")
-    .replace(/:\s*NaN/g, ":null")
-    .replace(/:\s*Infinity/g, ":null")
-    .replace(/:\s*-Infinity/g, ":null");
+function makeLineChart(canvasId, label){
+  const c = document.getElementById(canvasId);
+  if (!c) return null;
 
-  try {
-    return JSON.parse(cleaned);
-  } catch (e) {
-    console.log("❌ JSON parse error. RAW=", raw);
-    console.log("❌ JSON parse error. CLEANED=", cleaned);
-    console.log(e);
-    return null;
-  }
-}
-
-// ===================== CHARTS (optional) =====================
-const MAX_POINTS = 40;
-
-function pushSeries(series, label, value){
-  series.labels.push(label);
-  series.values.push(value);
-  while(series.labels.length > MAX_POINTS){
-    series.labels.shift();
-    series.values.shift();
-  }
-}
-
-function makeChart(canvasId, label){
-  const canvas = document.getElementById(canvasId);
-  if (!canvas || !window.Chart) return null;
-
-  const ctx = canvas.getContext("2d");
-  const series = { labels: [], values: [] };
-
-  const chart = new Chart(ctx, {
+  const ctx = c.getContext("2d");
+  return new Chart(ctx, {
     type: "line",
     data: {
-      labels: series.labels,
+      labels: [],
       datasets: [{
         label,
-        data: series.values,
+        data: [],
         tension: 0.25,
-        pointRadius: 2
+        pointRadius: 2,
+        borderWidth: 2,
+        fill: false
       }]
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       animation: false,
-      plugins: { legend: { display: true } },
+      plugins: {
+        legend: { display: true }
+      },
       scales: {
         x: { ticks: { maxTicksLimit: 8 } },
         y: { beginAtZero: false }
       }
     }
   });
-
-  return { chart, series };
 }
 
-// خزّنا charts حسب IDs اللي كاينين فـ HTML ديالك (إلا ماكانوش كيتجاهل)
-const charts = {};
+function pushPoint(chart, label, value){
+  if (!chart) return;
+  const v = Number(value);
+  if (Number.isNaN(v)) return;
 
-// جرّب هاد الأسماء (خلي اللي عندك)
-function initCharts(){
-  charts.temp   = makeChart("tempChart",   "Air Temperature (°C)");
-  charts.soil   = makeChart("soilChart",   "Soil (%) / ADC");
-  charts.wind   = makeChart("windChart",   "Wind (m/s)");
-  charts.press  = makeChart("pressChart",  "Pressure (hPa)");
-  charts.ppfd   = makeChart("ppfdChart",   "PPFD");
-  charts.vpd    = makeChart("vpdChart",    "VPD (kPa)");
-  charts.et0    = makeChart("et0Chart",    "ET0 rate (mm/h)");
+  chart.data.labels.push(label);
+  chart.data.datasets[0].data.push(v);
+
+  while(chart.data.labels.length > maxPoints){
+    chart.data.labels.shift();
+    chart.data.datasets[0].data.shift();
+  }
+  chart.update();
 }
 
-function updateChart(ref, label, value){
-  if (!ref || value === null || value === undefined || Number.isNaN(Number(value))) return;
-  pushSeries(ref.series, label, Number(value));
-  ref.chart.update();
-}
+// Create charts AFTER page load
+window.addEventListener("load", () => {
+  // ⚠️ هنا حطّ IDs ديال canvas اللي عندك فـ HTML (إلا مختلفين بدّلهم غير هنا)
+  charts.temp   = makeLineChart("tempChart",   "Air Temperature (°C)");
+  charts.soil   = makeLineChart("soilChart",   "Soil (% / ADC)");
+  charts.wind   = makeLineChart("windChart",   "Wind (m/s)");
+  charts.press  = makeLineChart("pressChart",  "Pressure (hPa)");
+  charts.ppfd   = makeLineChart("ppfdChart",   "PPFD");
+  charts.edi    = makeLineChart("ediChart",    "EDI / ET0");
+
+  // small UI init
+  setText("topicTxt", MQTT_TOPIC);
+  setText("msgCount", "0");
+  setOnline(false, "Connecting...");
+});
 
 // ===================== MQTT CONNECT =====================
-setOnline(false, "Connecting...");
-
-let msgCount = 0;
-
 const client = mqtt.connect(MQTT_HOST, {
   username: MQTT_USER,
   password: MQTT_PASS,
   clientId: "dash_" + Math.random().toString(16).slice(2),
   clean: true,
-  connectTimeout: 7000,
-  reconnectPeriod: 2500,
+  connectTimeout: 8000,
+  reconnectPeriod: 2000
 });
+
+let msgCounter = 0;
 
 client.on("connect", () => {
   setOnline(true, "MQTT Connected ✅");
 
-  // باش تعرفي واش كيوصلو messages: كنكتب topic فالكارت
-  setText("mqttTopic", MQTT_TOPIC);
-  setText("msgsCount", msgCount);
-
-  // Subscribe للtopic + wildcard احتياطاً
+  // Subscribe exact topic (no wildcard here)
   client.subscribe(MQTT_TOPIC, { qos: 0 }, (err) => {
-    if (err) setOnline(false, "Subscribe error ❌");
+    if (err) {
+      console.log("Subscribe error:", err);
+      setOnline(false, "Subscribe error ❌");
+    } else {
+      console.log("Subscribed to:", MQTT_TOPIC);
+    }
   });
-  client.subscribe(MQTT_TOPIC + "/#", { qos: 0 }, () => {}); // safe extra
 });
 
 client.on("reconnect", () => setOnline(false, "Reconnecting..."));
-client.on("close", () => setOnline(false, "Disconnected"));
+client.on("close",     () => setOnline(false, "Disconnected"));
 client.on("error", (e) => {
   console.log("MQTT error:", e);
   setOnline(false, "MQTT Error");
 });
 
-window.addEventListener("load", () => {
-  initCharts();
-});
-
-// ===================== MESSAGE HANDLER =====================
 client.on("message", (topic, message) => {
+  // 1) Verify topic + raw payload
   const raw = message.toString();
+  console.log("[MQTT] topic:", topic);
+  console.log("[MQTT] raw:", raw);
 
-  // Debug: خليه خدام حتى يبان لك واش كيوصلو messages
-  // فتح DevTools Console وغادي تشوف هاد السطور
-  console.log("📩 TOPIC:", topic);
-  console.log("📩 RAW:", raw);
+  // 2) Update counters
+  msgCounter++;
+  setText("msgCount", String(msgCounter));
+  setText("topicTxt", topic);
 
-  const d = safeParse(raw);
-  if (!d) return; // parse فشل
-
-  msgCount++;
-  setText("msgsCount", msgCount);
-  setText("mqttTopic", topic);
-
-  // ====== Fields (مطابقة للي كيبعث ESP32 ديالك) ======
-  // من الصورة ديال EMQX كيبانو: air_temp, air_rh, soil_pct, lux, ppfd, pressure_hpa, wind_ms, vpd, et0_rate_mm_h, pump...
-  const airT     = d.air_temp ?? d.temperature;
-  const airRH    = d.air_rh ?? d.humidity;
-  const soilPct  = d.soil_pct;
-  const soilADC  = d.soil_adc ?? d.soilADC ?? d.soil_adc_raw; // إلا عندك نسخة ADC
-  const lux      = d.lux;
-  const ppfd     = d.ppfd;
-  const pressHpa = d.pressure_hpa ?? d.pressure_hpa ?? d.pressure;
-  const windMs   = d.wind_ms ?? d.wind;
-  const vpdKpa   = d.vpd;
-  const et0Rate  = d.et0_rate_mm_h;
-  const et0Daily = d.et0_daily_est_mm;
-  const pump     = d.pump ?? "OFF";
-
-  // ====== Update KPIs (استعمل نفس IDs اللي فـ HTML ديالك) ======
-  // إذا شي ID ما كاينش، setText كتتجاهلو بلا مشاكل
-  setText("airT",  fmt(airT, 1));
-  setText("airRH", fmt(airRH, 1));
-
-  // Soil: إلا جا ADC كنوريه، إلا لا كنوري %
-  if (soilADC !== undefined && soilADC !== null && !Number.isNaN(Number(soilADC))){
-    setText("soil", Math.round(Number(soilADC)));
-  } else {
-    setText("soil", fmt(soilPct, 1));
+  // 3) Parse JSON
+  let d;
+  try {
+    d = JSON.parse(raw);
+  } catch (e) {
+    console.log("JSON parse error:", e);
+    return;
   }
 
-  setText("lux",   (lux === null || lux === undefined || Number.isNaN(Number(lux))) ? "--" : Math.round(Number(lux)));
-  setText("ppfd",  fmt(ppfd, 2));
-  setText("wind",  fmt(windMs, 2));
-  setText("press", fmt(pressHpa, 1));
-  setText("vpd",   fmt(vpdKpa, 2));
+  // 4) Map fields (حسب payload ديال ESP32 اللي ورّيتي فـ EMQX)
+  const airT   = d.air_temp ?? d.temperature;
+  const airRH  = d.air_rh   ?? d.humidity;
 
-  // EDI/ETO: عندك فـ ESP32 ما كاينش edi، ولكن كاين et0_rate و et0_daily
-  // نخلي "edi" يعرض ET0_rate باش ماتبانش خاوية
-  setText("edi", fmt(et0Rate, 3));
+  const soilPct = d.soil_pct;               // فـ نسخة ET0
+  const soilADC = d.soil_adc ?? d.soilADC;  // فـ نسخة MQTT البسيطة
+  const lux    = d.lux;
+  const ppfd   = d.ppfd;
 
-  // Pump badge
+  const wind   = d.wind_ms;
+  const press  = d.pressure_hpa;
+  const vpd    = d.vpd;
+
+  // “EDI/ET0” => نستعمل ET0 rate أو daily est (حسب شنو كترسل)
+  const et0rate = d.et0_rate_mm_h;
+  const et0day  = d.et0_daily_est_mm;
+
+  const pump    = d.pump ?? "OFF";
+
+  // 5) Fill KPIs (هاد IDs خاصهم يكونو فـ HTML)
+  // إذا شي ID ما كاينش، ما كيوقع حتى error
+  setText("airT", fmt(airT, 1));
+  setText("airRH", fmt(airRH, 1));
+
+  // Soil card: فضّل % وإذا ما كاينش هز ADC
+  if (soilPct !== undefined && soilPct !== null) {
+    setText("soil", fmt(soilPct, 1));
+  } else if (soilADC !== undefined && soilADC !== null) {
+    setText("soil", String(Math.round(Number(soilADC))));
+  } else {
+    setText("soil", "--");
+  }
+
+  setText("lux", fmt(lux, 0));
+  setText("ppfd", fmt(ppfd, 2));
+
+  setText("wind", fmt(wind, 2));
+  setText("press", fmt(press, 1));
+  setText("vpd", fmt(vpd, 2));
+
+  // EDI/ET0 display
+  if (et0rate !== undefined && et0rate !== null && !Number.isNaN(Number(et0rate))) {
+    setText("edi", fmt(et0rate, 3));      // ET0 rate
+  } else {
+    setText("edi", fmt(et0day, 2));       // fallback daily
+  }
+
   setPumpBadge(pump);
-  setText("pumpTxt", String(pump).toUpperCase()); // إذا عندك هذا الID
-  setText("pump", String(pump).toUpperCase());    // إذا عندك هذا الID
 
-  // Last update
-  setText("lastUpdate", new Date().toLocaleString());
+  // last update
+  setText("lastUpdate", new Date().toLocaleTimeString());
 
-  // ====== Charts (إذا كانو canvases موجودين) ======
+  // 6) Push to charts
   const tLabel = new Date().toLocaleTimeString();
 
-  updateChart(charts.temp,  tLabel, airT);
-  updateChart(charts.soil,  tLabel, (soilADC ?? soilPct));
-  updateChart(charts.wind,  tLabel, windMs);
-  updateChart(charts.press, tLabel, pressHpa);
-  updateChart(charts.ppfd,  tLabel, ppfd);
-  updateChart(charts.vpd,   tLabel, vpdKpa);
-  updateChart(charts.et0,   tLabel, et0Rate);
+  pushPoint(charts.temp,  tLabel, airT);
 
-  // Extra display if you have these IDs
-  setText("et0Rate", fmt(et0Rate, 4));
-  setText("et0Daily", fmt(et0Daily, 2));
+  // soil chart: إذا % موجودة ديرها، إلا لا دير ADC
+  if (soilPct !== undefined && soilPct !== null) {
+    pushPoint(charts.soil, tLabel, soilPct);
+  } else {
+    pushPoint(charts.soil, tLabel, soilADC);
+  }
+
+  pushPoint(charts.wind,  tLabel, wind);
+  pushPoint(charts.press, tLabel, press);
+  pushPoint(charts.ppfd,  tLabel, ppfd);
+
+  // edi chart: نفس logic
+  if (et0rate !== undefined && et0rate !== null) {
+    pushPoint(charts.edi, tLabel, et0rate);
+  } else {
+    pushPoint(charts.edi, tLabel, et0day);
+  }
 });
