@@ -1,106 +1,103 @@
-// app.js (Safari-friendly) — Paho MQTT over WSS
-const HOST  = "n1122166.ala.eu-central-1.emqxsl.com";
-const PORT  = 8084;
-const PATH  = "/mqtt";
-const USER  = "sara";
-const PASS  = "12345678";
-const TOPIC = "smart/irrigation";
+// ===== MQTT CONFIG =====
+const MQTT_URL = "wss://n1122166.ala.eu-central-1.emqxsl.com:8084/mqtt";
+const MQTT_OPTIONS = {
+  username: "sara",
+  password: "12345678",
+  clientId: "dashboard_" + Math.random().toString(16).substr(2,8),
+  clean: true,
+  connectTimeout: 4000,
+  reconnectPeriod: 3000
+};
 
-const $ = (id)=>document.getElementById(id);
+const MQTT_TOPIC = "smart/irrigation";
 
-function setOnline(ok,msg){
-  const dot = $("dot");
+// ===== UI =====
+const airT = document.getElementById("airT");
+const airRH = document.getElementById("airRH");
+const soil = document.getElementById("soil");
+const pumpBadge = document.getElementById("pumpBadge");
+const dot = document.getElementById("dot");
+const statusTxt = document.getElementById("statusTxt");
+
+function setStatus(ok, msg){
   dot.classList.remove("ok","no");
   dot.classList.add(ok ? "ok" : "no");
-  $("statusTxt").textContent = msg;
+  statusTxt.textContent = msg;
 }
-function fmt(x,n=1){
-  const v = Number(x);
-  return Number.isFinite(v) ? v.toFixed(n) : "--";
+
+// ===== Charts =====
+const tempCtx = document.getElementById("tempChart");
+const soilCtx = document.getElementById("soilChart");
+
+const tempChart = new Chart(tempCtx,{
+  type:"line",
+  data:{labels:[],datasets:[{label:"Temperature °C",data:[]}]},
+  options:{responsive:true,animation:false}
+});
+
+const soilChart = new Chart(soilCtx,{
+  type:"line",
+  data:{labels:[],datasets:[{label:"Soil ADC",data:[]}]},
+  options:{responsive:true,animation:false}
+});
+
+let historyBuffer = [];
+
+function updateCharts(data){
+  historyBuffer.push(data);
+  if(historyBuffer.length > 30) historyBuffer.shift();
+
+  const labels = historyBuffer.map((_,i)=>i+1);
+
+  tempChart.data.labels = labels;
+  soilChart.data.labels = labels;
+
+  tempChart.data.datasets[0].data =
+    historyBuffer.map(x=>x.temperature);
+
+  soilChart.data.datasets[0].data =
+    historyBuffer.map(x=>x.soil_adc);
+
+  tempChart.update();
+  soilChart.update();
 }
-function setPump(state){
-  const badge = $("pumpBadge");
-  const txt = $("pumpTxt");
-  const st = String(state||"").toUpperCase();
-  if(st==="ON"){
-    badge.classList.add("on"); badge.classList.remove("off");
-    txt.textContent="PUMP ON";
-  }else{
-    badge.classList.add("off"); badge.classList.remove("on");
-    txt.textContent="PUMP OFF";
+
+// ===== MQTT CONNECT =====
+setStatus(false,"Connecting MQTT...");
+
+const client = mqtt.connect(MQTT_URL, MQTT_OPTIONS);
+
+client.on("connect", ()=>{
+  setStatus(true,"MQTT Connected");
+  client.subscribe(MQTT_TOPIC);
+});
+
+client.on("error",(err)=>{
+  console.log("MQTT Error:",err);
+  setStatus(false,"Connection Error");
+});
+
+client.on("message",(topic,message)=>{
+  try{
+    const data = JSON.parse(message.toString());
+
+    airT.textContent = data.temperature ?? "--";
+    airRH.textContent = data.humidity ?? "--";
+    soil.textContent = data.soil_adc ?? "--";
+
+    if(data.pump === "ON"){
+      pumpBadge.textContent = "ON";
+      pumpBadge.classList.remove("off");
+      pumpBadge.classList.add("on");
+    }else{
+      pumpBadge.textContent = "OFF";
+      pumpBadge.classList.remove("on");
+      pumpBadge.classList.add("off");
+    }
+
+    updateCharts(data);
+
+  }catch(e){
+    console.log("JSON error",e);
   }
-}
-
-// Charts
-function makeChart(canvasId,label){
-  return new Chart($(canvasId),{
-    type:"line",
-    data:{labels:[],datasets:[{label,data:[]}]},
-    options:{responsive:true,animation:false,plugins:{legend:{display:false}}}
-  });
-}
-const chTemp = makeChart("cTemp","Temp");
-const chHum  = makeChart("cHum","Humidity");
-const chSoil = makeChart("cSoil","Soil ADC");
-const chPump = makeChart("cPump","Pump");
-
-const HIST_MAX=30;
-const hist=[]; // {t,h,s,p}
-function updateCharts(){
-  const labels = hist.map((_,i)=>String(i+1));
-  chTemp.data.labels=labels; chHum.data.labels=labels; chSoil.data.labels=labels; chPump.data.labels=labels;
-  chTemp.data.datasets[0].data=hist.map(x=>x.t);
-  chHum.data.datasets[0].data =hist.map(x=>x.h);
-  chSoil.data.datasets[0].data=hist.map(x=>x.s);
-  chPump.data.datasets[0].data=hist.map(x=>x.p);
-  chTemp.update(); chHum.update(); chSoil.update(); chPump.update();
-}
-
-let client=null;
-
-function connectMQTT(){
-  setOnline(false,"Connecting MQTT…");
-
-  const clientId = "dash_" + Math.random().toString(16).slice(2);
-  client = new Paho.MQTT.Client(HOST, Number(PORT), PATH, clientId);
-
-  client.onConnectionLost = ()=> setOnline(false,"Disconnected");
-  client.onMessageArrived = (msg)=>{
-    try{
-      const d = JSON.parse(msg.payloadString);
-
-      $("airT").textContent  = fmt(d.temperature,1);
-      $("airRH").textContent = fmt(d.humidity,1);
-      $("soil").textContent  = (d.soil_adc ?? "--");
-      setPump(d.pump);
-      $("timeLbl").textContent = "Last update: " + new Date().toLocaleTimeString();
-
-      const t=Number(d.temperature), h=Number(d.humidity), s=Number(d.soil_adc);
-      const p=(String(d.pump||"").toUpperCase()==="ON")?1:0;
-
-      hist.push({t:Number.isFinite(t)?t:null,h:Number.isFinite(h)?h:null,s:Number.isFinite(s)?s:null,p});
-      while(hist.length>HIST_MAX) hist.shift();
-      updateCharts();
-    }catch(e){
-      console.log("JSON error",e);
-    }
-  };
-
-  client.connect({
-    useSSL:true,
-    userName:USER,
-    password:PASS,
-    timeout:8,
-    onSuccess:()=>{
-      setOnline(true,"MQTT Connected");
-      client.subscribe(TOPIC,{qos:0});
-    },
-    onFailure:(err)=>{
-      console.log("Connect fail", err);
-      setOnline(false,"MQTT Error");
-    }
-  });
-}
-
-$("reconnectBtn").addEventListener("click", connectMQTT);
-connectMQTT();
+});
