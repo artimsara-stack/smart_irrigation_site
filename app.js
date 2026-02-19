@@ -1,103 +1,82 @@
-// ===== MQTT CONFIG =====
-const MQTT_URL = "wss://n1122166.ala.eu-central-1.emqxsl.com:8084/mqtt";
-const MQTT_OPTIONS = {
-  username: "sara",
-  password: "12345678",
-  clientId: "dashboard_" + Math.random().toString(16).substr(2,8),
-  clean: true,
-  connectTimeout: 4000,
-  reconnectPeriod: 3000
-};
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Smart Irrigation Dashboard</title>
 
-const MQTT_TOPIC = "smart/irrigation";
+  <!-- CSS ديالك -->
+  <link rel="stylesheet" href="style.css">
 
-// ===== UI =====
-const airT = document.getElementById("airT");
-const airRH = document.getElementById("airRH");
-const soil = document.getElementById("soil");
-const pumpBadge = document.getElementById("pumpBadge");
-const dot = document.getElementById("dot");
-const statusTxt = document.getElementById("statusTxt");
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-function setStatus(ok, msg){
-  dot.classList.remove("ok","no");
-  dot.classList.add(ok ? "ok" : "no");
-  statusTxt.textContent = msg;
-}
+  <!-- MQTT.js -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
 
-// ===== Charts =====
-const tempCtx = document.getElementById("tempChart");
-const soilCtx = document.getElementById("soilChart");
+<body>
+<div class="container">
 
-const tempChart = new Chart(tempCtx,{
-  type:"line",
-  data:{labels:[],datasets:[{label:"Temperature °C",data:[]}]},
-  options:{responsive:true,animation:false}
-});
+<header>
+  <div class="title">
+    <div class="logo"></div>
+    <div>
+      <h2>Smart Irrigation</h2>
+      <div class="subtitle">ESP32 → MQTT → EMQX</div>
+    </div>
+  </div>
 
-const soilChart = new Chart(soilCtx,{
-  type:"line",
-  data:{labels:[],datasets:[{label:"Soil ADC",data:[]}]},
-  options:{responsive:true,animation:false}
-});
+  <div class="actions">
+    <div class="pill">
+      <span class="dot" id="dot"></span>
+      <span id="statusTxt">Connecting...</span>
+    </div>
+  </div>
+</header>
 
-let historyBuffer = [];
+<!-- KPIs -->
+<div class="grid">
 
-function updateCharts(data){
-  historyBuffer.push(data);
-  if(historyBuffer.length > 30) historyBuffer.shift();
+  <div class="card kpi">
+    <div class="label">Air Temperature</div>
+    <div class="value"><span id="airT">--</span> <span class="unit">°C</span></div>
+  </div>
 
-  const labels = historyBuffer.map((_,i)=>i+1);
+  <div class="card kpi">
+    <div class="label">Air Humidity</div>
+    <div class="value"><span id="airRH">--</span> <span class="unit">%</span></div>
+  </div>
 
-  tempChart.data.labels = labels;
-  soilChart.data.labels = labels;
+  <div class="card kpi">
+    <div class="label">Soil ADC</div>
+    <div class="value"><span id="soil">--</span></div>
+  </div>
 
-  tempChart.data.datasets[0].data =
-    historyBuffer.map(x=>x.temperature);
+  <div class="card kpi">
+    <div class="label">Pump</div>
+    <div class="value">
+      <span id="pumpBadge" class="badge off">OFF</span>
+    </div>
+  </div>
 
-  soilChart.data.datasets[0].data =
-    historyBuffer.map(x=>x.soil_adc);
+</div>
 
-  tempChart.update();
-  soilChart.update();
-}
+<!-- Charts -->
+<div class="charts">
 
-// ===== MQTT CONNECT =====
-setStatus(false,"Connecting MQTT...");
+  <div class="card chartCard">
+    <canvas id="tempChart"></canvas>
+  </div>
 
-const client = mqtt.connect(MQTT_URL, MQTT_OPTIONS);
+  <div class="card chartCard">
+    <canvas id="soilChart"></canvas>
+  </div>
 
-client.on("connect", ()=>{
-  setStatus(true,"MQTT Connected");
-  client.subscribe(MQTT_TOPIC);
-});
+</div>
 
-client.on("error",(err)=>{
-  console.log("MQTT Error:",err);
-  setStatus(false,"Connection Error");
-});
+</div>
 
-client.on("message",(topic,message)=>{
-  try{
-    const data = JSON.parse(message.toString());
-
-    airT.textContent = data.temperature ?? "--";
-    airRH.textContent = data.humidity ?? "--";
-    soil.textContent = data.soil_adc ?? "--";
-
-    if(data.pump === "ON"){
-      pumpBadge.textContent = "ON";
-      pumpBadge.classList.remove("off");
-      pumpBadge.classList.add("on");
-    }else{
-      pumpBadge.textContent = "OFF";
-      pumpBadge.classList.remove("on");
-      pumpBadge.classList.add("off");
-    }
-
-    updateCharts(data);
-
-  }catch(e){
-    console.log("JSON error",e);
-  }
-});
+<script src="app.js"></script>
+</body>
+</html>
