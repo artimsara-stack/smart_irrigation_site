@@ -1,83 +1,144 @@
 <!doctype html>
 <html lang="fr">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Smart Irrigation — Dashboard</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Smart Irrigation Dashboard</title>
 
-<link rel="stylesheet" href="style.css">
+  <!-- CSS ديالك -->
+  <link rel="stylesheet" href="style.css">
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- MQTT.js -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 
 <body>
 <div class="container">
 
 <header>
-  <div>
-    <h1>Smart Irrigation — Dashboard</h1>
-    <div class="subtitle">ESP32 → MQTT → EMQX → GitHub Pages</div>
+  <div class="title">
+    <div class="logo"></div>
+    <div>
+      <h2>Smart Irrigation</h2>
+      <div class="subtitle">ESP32 → MQTT → EMQX</div>
+    </div>
   </div>
 
   <div class="actions">
-    <div class="live">
+    <div class="pill">
       <span class="dot" id="dot"></span>
       <span id="statusTxt">Connecting...</span>
     </div>
+    <button class="btn" id="themeBtn" type="button">🌓 Theme</button>
+    <button class="btn" id="clearBtn" type="button">🧹 Clear</button>
   </div>
 </header>
 
+<!-- KPIs -->
 <div class="grid">
 
-  <div class="card">
-    <h3>Air Temperature</h3>
-    <div class="value"><span id="airT">--</span> °C</div>
+  <div class="card kpi">
+    <div class="label">Air Temperature</div>
+    <div class="value"><span id="airT">--</span> <span class="unit">°C</span></div>
+    <div class="sub" id="timeLbl">Last update: --</div>
   </div>
 
-  <div class="card">
-    <h3>Air Humidity</h3>
-    <div class="value"><span id="airRH">--</span> %</div>
+  <div class="card kpi">
+    <div class="label">Air Humidity</div>
+    <div class="value"><span id="airRH">--</span> <span class="unit">%</span></div>
+    <div class="sub">DHT22</div>
   </div>
 
-  <div class="card">
-    <h3>Soil Moisture</h3>
-    <div class="value"><span id="soil">--</span> %</div>
+  <div class="card kpi">
+    <div class="label">Soil (monitor)</div>
+    <div class="value"><span id="soil">--</span> <span class="unit" id="soilUnit">%</span></div>
+    <div class="sub" id="soilSub">--</div>
   </div>
 
-  <div class="card">
-    <h3>Light (PPFD)</h3>
-    <div class="value"><span id="ppfd">--</span></div>
+  <div class="card kpi">
+    <div class="label">Light</div>
+    <div class="value"><span id="ppfd">--</span> <span class="unit">PPFD</span></div>
+    <div class="sub"><span id="lux">--</span> lux</div>
   </div>
 
-  <div class="card">
-    <h3>Wind Speed</h3>
-    <div class="value"><span id="wind">--</span> m/s</div>
+  <div class="card kpi">
+    <div class="label">Wind Speed</div>
+    <div class="value"><span id="wind">--</span> <span class="unit">m/s</span></div>
+    <div class="sub">Anemometer</div>
   </div>
 
-  <div class="card">
-    <h3>Pressure</h3>
-    <div class="value"><span id="pressure">--</span> hPa</div>
+  <div class="card kpi">
+    <div class="label">Pressure</div>
+    <div class="value"><span id="press">--</span> <span class="unit">hPa</span></div>
+    <div class="sub">BMP280</div>
   </div>
 
-  <div class="card control">
-    <h3>Control Summary</h3>
-    <div id="pumpBadge" class="pump off">PUMP OFF</div>
-    <div class="mini">
-      VPD: <span id="vpd">--</span> kPa
+  <div class="card kpi">
+    <div class="label">VPD</div>
+    <div class="value"><span id="vpd">--</span> <span class="unit">kPa</span></div>
+    <div class="sub">Derived</div>
+  </div>
+
+  <div class="card kpi">
+    <div class="label">EDI / ET0</div>
+    <div class="value"><span id="edi">--</span></div>
+    <div class="sub" id="ediSub">index</div>
+  </div>
+
+  <div class="card kpi">
+    <div class="label">Pump</div>
+    <div class="value">
+      <span id="pumpBadge" class="badge off">OFF</span>
     </div>
-    <div class="mini">
-      ET0: <span id="et0">--</span> mm/h
+    <div class="sub" id="dayNight">--</div>
+  </div>
+
+  <div class="card kpi">
+    <div class="label">MQTT Topic</div>
+    <div class="value" style="font-size:16px;font-weight:700">
+      <span id="topicLbl">--</span>
     </div>
+    <div class="sub">msgs: <span id="msgCount">0</span></div>
   </div>
 
 </div>
 
+<!-- Charts -->
 <div class="charts">
-  <div class="chartCard"><canvas id="tempChart"></canvas></div>
-  <div class="chartCard"><canvas id="soilChart"></canvas></div>
-  <div class="chartCard"><canvas id="windChart"></canvas></div>
-  <div class="chartCard"><canvas id="pressChart"></canvas></div>
+
+  <div class="card chartCard">
+    <div class="label">Air Temperature (°C)</div>
+    <canvas id="cTemp"></canvas>
+  </div>
+
+  <div class="card chartCard">
+    <div class="label">Soil (%) / ADC</div>
+    <canvas id="cSoil"></canvas>
+  </div>
+
+  <div class="card chartCard">
+    <div class="label">Wind (m/s)</div>
+    <canvas id="cWind"></canvas>
+  </div>
+
+  <div class="card chartCard">
+    <div class="label">Pressure (hPa)</div>
+    <canvas id="cPress"></canvas>
+  </div>
+
+  <div class="card chartCard">
+    <div class="label">EDI / ET0</div>
+    <canvas id="cEdi"></canvas>
+  </div>
+
+  <div class="card chartCard">
+    <div class="label">PPFD</div>
+    <canvas id="cPpfd"></canvas>
+  </div>
+
 </div>
 
 </div>
