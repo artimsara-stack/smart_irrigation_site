@@ -1,129 +1,159 @@
+/***********************
+ * app.js — Smart Irrigation Dashboard (MQTT)
+ * Works with ESP32 payload keys like:
+ * air_temp, air_rh, soil_pct, pump, ts ...
+ ***********************/
+
 // ===== EMQX CONFIG =====
 const MQTT_HOST  = "wss://n1122166.ala.eu-central-1.emqxsl.com:8084/mqtt";
 const MQTT_USER  = "sara";
 const MQTT_PASS  = "12345678";
 
-// ✅ نفس التوبيك اللي باين ف EMQX Online Test
+// ✅ نفس التوبيك اللي باين فـ EMQX Online Test
 const MQTT_TOPIC = "smart/irrigation";
 
 // ===== UI =====
-const dot = document.getElementById("dot");
-const statusTxt = document.getElementById("statusTxt");
+const el = (id) => document.getElementById(id);
 
-const airT = document.getElementById("airT");
-const airRH = document.getElementById("airRH");
-const soil = document.getElementById("soil");
-const pumpBadge = document.getElementById("pumpBadge");
-
-// ===== STATUS HELPERS =====
 function setOnline(ok, msg) {
-  dot.classList.remove("ok", "no");
-  dot.classList.add(ok ? "ok" : "no");
-  statusTxt.textContent = msg;
-}
-
-function setText(el, v, digits = null) {
-  if (!el) return;
-  if (v === undefined || v === null || v === "" || Number.isNaN(v)) {
-    el.textContent = "--";
-    return;
+  const dot = el("dot");
+  if (dot) {
+    dot.classList.remove("ok", "no");
+    dot.classList.add(ok ? "ok" : "no");
   }
-  const n = Number(v);
-  if (!Number.isNaN(n) && digits !== null) el.textContent = n.toFixed(digits);
-  else el.textContent = String(v);
+  if (el("statusTxt")) el("statusTxt").textContent = msg;
 }
 
-// ===== CHARTS =====
-const tempChart = new Chart(document.getElementById("tempChart"), {
-  type: "line",
-  data: { labels: [], datasets: [{ label: "Temperature °C", data: [], tension: 0.3 }] },
-  options: { responsive: true, animation: false, plugins: { legend: { display: true } } }
-});
+function setPumpBadge(state) {
+  const badge = el("pumpBadge");
+  if (!badge) return;
+  const on = String(state).toUpperCase() === "ON";
+  badge.textContent = on ? "ON" : "OFF";
+  badge.classList.toggle("on", on);
+  badge.classList.toggle("off", !on);
+}
 
-const soilChart = new Chart(document.getElementById("soilChart"), {
-  type: "line",
-  data: { labels: [], datasets: [{ label: "Soil", data: [], tension: 0.3 }] },
-  options: { responsive: true, animation: false, plugins: { legend: { display: true } } }
-});
+// ===== Charts =====
+let tempChart, soilChart;
+const maxPoints = 30;
+const series = {
+  labels: [],
+  temp: [],
+  soil: []
+};
 
-const MAX_POINTS = 30;
-function pushPoint(chart, value) {
-  const t = new Date().toLocaleTimeString();
-  chart.data.labels.push(t);
-  chart.data.datasets[0].data.push(value);
+function pushPoint(label, t, s) {
+  series.labels.push(label);
+  series.temp.push(t);
+  series.soil.push(s);
 
-  while (chart.data.labels.length > MAX_POINTS) {
-    chart.data.labels.shift();
-    chart.data.datasets[0].data.shift();
+  while (series.labels.length > maxPoints) {
+    series.labels.shift();
+    series.temp.shift();
+    series.soil.shift();
   }
-  chart.update();
 }
 
-// ===== MQTT CONNECT =====
+function initCharts() {
+  const tctx = el("tempChart")?.getContext("2d");
+  const sctx = el("soilChart")?.getContext("2d");
+  if (!tctx || !sctx || !window.Chart) return;
+
+  tempChart = new Chart(tctx, {
+    type: "line",
+    data: {
+      labels: series.labels,
+      datasets: [{ label: "Temperature °C", data: series.temp, tension: 0.3 }]
+    },
+    options: { responsive: true, animation: false, plugins: { legend: { display: true } } }
+  });
+
+  soilChart = new Chart(sctx, {
+    type: "line",
+    data: {
+      labels: series.labels,
+      datasets: [{ label: "Soil (%)", data: series.soil, tension: 0.3 }]
+    },
+    options: { responsive: true, animation: false, plugins: { legend: { display: true } } }
+  });
+}
+
+// ===== MQTT Connect =====
 setOnline(false, "Connecting...");
 
 const client = mqtt.connect(MQTT_HOST, {
   username: MQTT_USER,
   password: MQTT_PASS,
-  clientId: "dash_" + Math.random().toString(16).slice(2),
+  clientId: "dashboard_" + Math.random().toString(16).slice(2),
   clean: true,
   connectTimeout: 5000,
-  reconnectPeriod: 2000
+  reconnectPeriod: 3000,
+  // sometimes helps with some brokers:
+  protocolVersion: 4
 });
 
 client.on("connect", () => {
-  setOnline(true, "MQTT Connected");
+  setOnline(true, "MQTT Connected ✅");
+  console.log("[MQTT] connected");
+
+  // ✅ subscribe على التوبيك الصحيح
   client.subscribe(MQTT_TOPIC, { qos: 0 }, (err) => {
-    if (err) setOnline(false, "Subscribe error");
-    else setOnline(true, "Subscribed: " + MQTT_TOPIC);
+    if (err) console.error("[MQTT] subscribe error:", err);
+    else console.log("[MQTT] subscribed:", MQTT_TOPIC);
   });
+
+  // (اختياري) إلا كان شي sub-topic
+  client.subscribe(MQTT_TOPIC + "/#", { qos: 0 }, () => {});
+});
+
+client.on("reconnect", () => {
+  setOnline(false, "Reconnecting...");
 });
 
 client.on("error", (err) => {
-  console.error("MQTT error:", err);
+  console.error("[MQTT] error:", err);
   setOnline(false, "MQTT Error");
 });
 
-client.on("reconnect", () => setOnline(false, "Reconnecting..."));
-client.on("close", () => setOnline(false, "Disconnected"));
+client.on("close", () => {
+  setOnline(false, "Disconnected");
+});
 
-// ===== MESSAGE HANDLER =====
 client.on("message", (topic, message) => {
-  if (topic !== MQTT_TOPIC) return;
+  const txt = message.toString();
+  console.log("[MQTT] msg topic=", topic, "payload=", txt);
 
   let d;
   try {
-    d = JSON.parse(message.toString());
+    d = JSON.parse(txt);
   } catch (e) {
-    console.error("JSON parse error:", e, message.toString());
+    console.error("JSON parse error:", e);
     return;
   }
 
-  // ✅ Key mapping (باش يخدم مع أي نسخة ديال ESP32)
-  // نسخة الصورة (Online Test): air_temp / air_rh / soil_pct / pump
-  // نسخة أخرى: temperature / humidity / soil_adc / pump
-  const T  = d.air_temp ?? d.temperature ?? d.temp ?? null;
-  const RH = d.air_rh   ?? d.humidity    ?? d.rh   ?? null;
-  const SO = d.soil_pct ?? d.soil        ?? d.soil_adc ?? null;
-  const P  = d.pump ?? "OFF";
+  // ✅ keys اللي كيرسل ESP32 فالصورة: air_temp, air_rh, soil_pct, pump
+  const airT  = d.air_temp ?? d.temperature ?? null;
+  const airRH = d.air_rh   ?? d.humidity    ?? null;
+  const soil  = d.soil_pct ?? d.soil_adc    ?? d.soil ?? null;
+  const pump  = d.pump ?? "OFF";
 
-  setText(airT, T, 1);
-  setText(airRH, RH, 1);
-  setText(soil, SO, (d.soil_adc !== undefined ? null : 1)); // adc نخليه raw
+  if (el("airT"))  el("airT").textContent  = (airT  === null || Number.isNaN(Number(airT)))  ? "--" : Number(airT).toFixed(1);
+  if (el("airRH")) el("airRH").textContent = (airRH === null || Number.isNaN(Number(airRH))) ? "--" : Number(airRH).toFixed(1);
+  if (el("soil"))  el("soil").textContent  = (soil  === null || Number.isNaN(Number(soil)))  ? "--" : String(soil);
 
-  // Pump badge
-  const on = String(P).toUpperCase() === "ON";
-  pumpBadge.textContent = on ? "ON" : "OFF";
-  pumpBadge.classList.toggle("on", on);
-  pumpBadge.classList.toggle("off", !on);
+  setPumpBadge(pump);
 
-  // Charts (غير إلا كانت أرقام)
-  const tNum = Number(T);
-  if (!Number.isNaN(tNum)) pushPoint(tempChart, tNum);
+  // charts
+  if (!tempChart || !soilChart) initCharts();
 
-  const sNum = Number(SO);
-  if (!Number.isNaN(sNum)) pushPoint(soilChart, sNum);
+  const label = new Date().toLocaleTimeString();
+  if (tempChart && soilChart) {
+    const tVal = (airT === null || Number.isNaN(Number(airT))) ? null : Number(airT);
+    const sVal = (soil === null || Number.isNaN(Number(soil))) ? null : Number(soil);
 
-  // Debug (مهم)
-  console.log("MQTT data:", d);
+    pushPoint(label, tVal, sVal);
+
+    tempChart.update();
+    soilChart.update();
+  }
 });
