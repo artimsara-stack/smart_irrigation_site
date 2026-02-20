@@ -148,7 +148,7 @@ function clearCharts(){
 
 // ===================== THEME + CLEAR =====================
 function toggleTheme(){
-  // نبدلو theme فـ body (ما كيمسّش CSS ديالك إلا كنتي كتستعمل data-theme)
+  // ما كنبدلوش الديزاين، غير كنبدلو attribute اللي كيتستعمل فـ CSS إلا عندك
   const b = document.body;
   const cur = b.getAttribute("data-theme") || "dark";
   b.setAttribute("data-theme", cur === "light" ? "dark" : "light");
@@ -164,6 +164,8 @@ function hookButtons(){
     msgCount = 0;
     setText("msgCount", msgCount);
     clearCharts();
+    // نخلي آخر رسالة تتصفر باش health-check يبان مزيان
+    lastMsgAt = 0;
   });
 }
 
@@ -172,12 +174,13 @@ let lastMsgAt = 0;
 const NO_DATA_AFTER_MS = 15000;
 
 function setNoDataState(){
-  // Warning dot
+  // dot أصفر
   const dot = $("dot");
   if(dot){
     dot.classList.remove("ok","no");
     dot.classList.add("warn");
   }
+
   setText("statusTxt", "No data / Device offline");
 
   // KPIs -> --
@@ -190,9 +193,11 @@ function setNoDataState(){
   setText("press","--");
   setText("vpd","--");
   setText("edi","--");
+
   setPumpBadge("OFF");
 
-  setText("soilSub","Sensor disconnected / No data");
+  // subtitles (اختياري)
+  setText("soilSub","No data / Sensor disconnected");
   setText("ediSub","No data");
   setText("dayNight","--");
 }
@@ -232,6 +237,10 @@ client.on("error", (e) => {
 
 // ===================== BOOT =====================
 window.addEventListener("load", () => {
+  // theme default
+  if (!document.body.getAttribute("data-theme")){
+    document.body.setAttribute("data-theme", "dark");
+  }
   initCharts();
   hookButtons();
 });
@@ -298,16 +307,26 @@ client.on("message", (topic, message) => {
 });
 
 // ===================== HEALTH CHECK LOOP =====================
+// ✅ هادي هي الزيادة اللي كتخلي "No data" يبان حتى إلا ما وصلات حتى رسالة
 setInterval(() => {
-  if (!lastMsgAt) return; // مازال ما وصلات حتى رسالة
 
+  // إذا ما وصلات حتى رسالة نهائياً
+  if (msgCount === 0){
+    setNoDataState();
+    setText("timeLbl", "Last update: --");
+    return;
+  }
+
+  // إذا كان كاين رسائل قبل، ولكن دابا وقفات
   const dt = Date.now() - lastMsgAt;
 
   if (dt > NO_DATA_AFTER_MS){
     setNoDataState();
-    setText("timeLbl", "Last update: " + new Date(lastMsgAt).toLocaleTimeString() + " (stale)");
+    setText(
+      "timeLbl",
+      "Last update: " + new Date(lastMsgAt).toLocaleTimeString() + " (stale)"
+    );
   } else {
-    // Fresh data => green dot
     const dot = $("dot");
     if(dot){
       dot.classList.remove("warn","no");
@@ -315,4 +334,5 @@ setInterval(() => {
     }
     setText("statusTxt", "Live ✅");
   }
+
 }, 1000);
