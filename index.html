@@ -5,13 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Smart Irrigation Dashboard</title>
 
-  <!-- CSS ديالك -->
   <link rel="stylesheet" href="style.css">
-
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- MQTT.js -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 
@@ -28,13 +23,14 @@
   </div>
 
   <div class="actions">
-    <!-- ✅ PILL ديال DATA (ديالك) -->
+
+    <!-- ✅ PILL ديال LIVE / DATA -->
     <div class="pill">
       <span class="dot" id="dot"></span>
-      <span id="statusTxt">Connecting...</span>
+      <span id="statusTxt">--</span>
     </div>
 
-    <!-- ✅ NEW: PILL ديال MQTT CONNECTIVITY -->
+    <!-- ✅ PILL ديال MQTT CONNECTIVITY -->
     <div class="pill">
       <span class="dot" id="mqttDot"></span>
       <span id="mqttStatusTxt">MQTT: --</span>
