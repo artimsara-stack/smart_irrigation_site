@@ -1,20 +1,19 @@
 /* =========================================================
    Smart Irrigation Dashboard — MQTT (EMQX)
-   Works with your HTML IDs:
+   HTML IDs:
    KPIs: airT airRH soil soilUnit soilSub ppfd lux wind press vpd edi ediSub
-        pumpBadge dayNight topicLbl msgCount timeLbl dot statusTxt
-   Charts canvases: cTemp cSoil cWind cPress cEdi cPpfd
+         pumpBadge dayNight topicLbl msgCount timeLbl
+   MQTT pill: dot statusTxt
+   LIVE pill: liveDot liveStatusTxt
+   Charts: cTemp cSoil cWind cPress cEdi cPpfd
    Buttons: themeBtn clearBtn
-
-   + NEW MQTT PILL:
-     mqttDot mqttStatusTxt
    ========================================================= */
 
 // ===================== MQTT CONFIG =====================
 const MQTT_HOST  = "wss://n1122166.ala.eu-central-1.emqxsl.com:8084/mqtt";
 const MQTT_USER  = "sara";
 const MQTT_PASS  = "12345678";
-const MQTT_TOPIC = "smart/irrigation"; // نفس اللي ف ESP32
+const MQTT_TOPIC = "smart/irrigation";
 
 // ===================== DOM HELPERS =====================
 const $ = (id) => document.getElementById(id);
@@ -31,30 +30,28 @@ function fmt(v, n=1){
   return x.toFixed(n);
 }
 
-// ✅ pill ديال DATA (القديمة)
-function setOnline(ok, msg){
+// ===================== MQTT PILL (dot/statusTxt) =====================
+function setMqttPill(state, msg){
   const dot = $("dot");
   if (dot){
     dot.classList.remove("ok","no","warn");
-    dot.classList.add(ok ? "ok" : "no");
+    dot.classList.add(state === "ok" ? "ok" : state === "no" ? "no" : "warn");
   }
   setText("statusTxt", msg);
 }
 
-// ✅ pill ديال MQTT (الجديدة)
-function setMqttPill(connected){
-  const dot = $("mqttDot");
-  const txt = $("mqttStatusTxt");
-
+// ===================== LIVE PILL (liveDot/liveStatusTxt) =====================
+function setLivePill(state, msg){
+  const dot = $("liveDot");
+  const txt = $("liveStatusTxt");
   if (dot){
     dot.classList.remove("ok","no","warn");
-    dot.classList.add(connected ? "ok" : "no");
+    dot.classList.add(state === "ok" ? "ok" : state === "no" ? "no" : "warn");
   }
-  if (txt){
-    txt.textContent = connected ? "MQTT Connected ✅" : "Disconnected ❌";
-  }
+  if (txt) txt.textContent = msg;
 }
 
+// ===================== Pump badge =====================
 function setPumpBadge(state){
   const b = $("pumpBadge");
   if (!b) return;
@@ -87,7 +84,7 @@ function safeParse(raw){
 
 // ===================== CHARTS =====================
 const MAX_POINTS = 40;
-const charts = {}; // { key: { chart, labels, data } }
+const charts = {};
 
 function addPoint(obj, label, value){
   obj.labels.push(label);
@@ -170,6 +167,10 @@ function toggleTheme(){
   b.setAttribute("data-theme", cur === "light" ? "dark" : "light");
 }
 
+let msgCount = 0;
+let lastMsgAt = 0;
+const NO_DATA_AFTER_MS = 15000;
+
 function hookButtons(){
   const themeBtn = $("themeBtn");
   const clearBtn = $("clearBtn");
@@ -178,25 +179,18 @@ function hookButtons(){
 
   if (clearBtn) clearBtn.addEventListener("click", () => {
     msgCount = 0;
-    setText("msgCount", msgCount);
-    clearCharts();
     lastMsgAt = 0;
+    setText("msgCount", msgCount);
+    setText("timeLbl", "Last update: --");
+    clearCharts();
+
+    // LIVE يرجع idle
+    setLivePill("warn", "Live: --");
   });
 }
 
-// ===================== DATA HEALTH (offline / no data) =====================
-let lastMsgAt = 0;
-const NO_DATA_AFTER_MS = 15000;
-
-function setNoDataState(){
-  const dot = $("dot");
-  if(dot){
-    dot.classList.remove("ok","no");
-    dot.classList.add("warn");
-  }
-
-  setText("statusTxt", "No data / Device offline");
-
+// ===================== “No Data” UI (KPIs فقط) =====================
+function setNoDataKpis(){
   setText("airT","--");
   setText("airRH","--");
   setText("soil","--");
@@ -206,7 +200,6 @@ function setNoDataState(){
   setText("press","--");
   setText("vpd","--");
   setText("edi","--");
-
   setPumpBadge("OFF");
 
   setText("soilSub","No data / Sensor disconnected");
@@ -215,10 +208,8 @@ function setNoDataState(){
 }
 
 // ===================== MQTT CONNECT =====================
-setOnline(false, "Connecting...");
-setMqttPill(false); // ✅ NEW
-
-let msgCount = 0;
+setMqttPill("warn", "Connecting...");
+setLivePill("warn", "Live: --");
 
 const client = mqtt.connect(MQTT_HOST, {
   username: MQTT_USER,
@@ -230,32 +221,22 @@ const client = mqtt.connect(MQTT_HOST, {
 });
 
 client.on("connect", () => {
-  setOnline(true, "MQTT Connected ✅"); // (pill القديمة كتبقى بحال ما عندك)
-  setMqttPill(true);                   // ✅ NEW
+  setMqttPill("ok", "MQTT Connected ✅");
 
   setText("topicLbl", MQTT_TOPIC);
   setText("msgCount", msgCount);
 
   client.subscribe(MQTT_TOPIC, { qos: 0 }, (err) => {
-    if (err) setOnline(false, "Subscribe error ❌");
+    if (err) setMqttPill("no", "Subscribe error ❌");
   });
   client.subscribe(MQTT_TOPIC + "/#", { qos: 0 }, () => {});
 });
 
-client.on("reconnect", () => {
-  setOnline(false, "Reconnecting...");
-  setMqttPill(false); // ✅ NEW
-});
-
-client.on("close", () => {
-  setOnline(false, "Disconnected");
-  setMqttPill(false); // ✅ NEW
-});
-
+client.on("reconnect", () => setMqttPill("warn", "Reconnecting..."));
+client.on("close", () => setMqttPill("no", "MQTT Disconnected ❌"));
 client.on("error", (e) => {
   console.log("MQTT error:", e);
-  setOnline(false, "MQTT Error");
-  setMqttPill(false); // ✅ NEW
+  setMqttPill("no", "MQTT Error ❌");
 });
 
 // ===================== BOOT =====================
@@ -267,7 +248,7 @@ window.addEventListener("load", () => {
   hookButtons();
 });
 
-// ===================== MESSAGE HANDLER (ONE ONLY) =====================
+// ===================== MESSAGE HANDLER =====================
 client.on("message", (topic, message) => {
   lastMsgAt = Date.now();
 
@@ -279,6 +260,7 @@ client.on("message", (topic, message) => {
   setText("msgCount", msgCount);
   setText("topicLbl", topic);
 
+  // ====== Fields ======
   const airT     = d.air_temp ?? d.temperature;
   const airRH    = d.air_rh ?? d.humidity;
   const soilPct  = d.soil_pct;
@@ -291,6 +273,7 @@ client.on("message", (topic, message) => {
   const pump     = d.pump ?? "OFF";
   const isDay    = d.is_day;
 
+  // ====== KPIs ======
   setText("airT",  fmt(airT, 1));
   setText("airRH", fmt(airRH, 1));
 
@@ -313,6 +296,18 @@ client.on("message", (topic, message) => {
 
   setText("timeLbl", "Last update: " + new Date().toLocaleTimeString());
 
+  // ====== LIVE pill logic ======
+  const sensorsOk =
+    (airT !== null && airT !== undefined && !Number.isNaN(Number(airT))) &&
+    (airRH !== null && airRH !== undefined && !Number.isNaN(Number(airRH)));
+
+  if (sensorsOk){
+    setLivePill("ok", "LIVE ✅");
+  } else {
+    setLivePill("warn", "ESP online — Sensors disconnected ⚠️");
+  }
+
+  // ====== Charts ======
   const tLabel = new Date().toLocaleTimeString();
   updateChart(charts.temp,  tLabel, airT);
   updateChart(charts.soil,  tLabel, soilPct);
@@ -324,30 +319,19 @@ client.on("message", (topic, message) => {
 
 // ===================== HEALTH CHECK LOOP =====================
 setInterval(() => {
-
+  // حتى ماجات حتى رسالة
   if (msgCount === 0){
-    setNoDataState();
+    setNoDataKpis();
     setText("timeLbl", "Last update: --");
-    // ⚠️ ما كنلمسوش mqttStatusTxt هنا، لأنها مرتبطة ب MQTT connect/close
+    setLivePill("warn", "Live: --");
     return;
   }
 
+  // كانت رسائل ووقفات
   const dt = Date.now() - lastMsgAt;
-
   if (dt > NO_DATA_AFTER_MS){
-    setNoDataState();
-    setText(
-      "timeLbl",
-      "Last update: " + new Date(lastMsgAt).toLocaleTimeString() + " (stale)"
-    );
-  } else {
-    const dot = $("dot");
-    if(dot){
-      dot.classList.remove("warn","no");
-      dot.classList.add("ok");
-    }
-    // ✅ خليها "MQTT Connected" كيفما بغيتي
-    setText("statusTxt", "MQTT Connected ✅");
+    setNoDataKpis();
+    setLivePill("no", "ESP Offline ❌");
+    setText("timeLbl", "Last update: " + new Date(lastMsgAt).toLocaleTimeString() + " (stale)");
   }
-
 }, 1000);
