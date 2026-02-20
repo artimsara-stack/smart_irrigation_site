@@ -5,6 +5,9 @@
         pumpBadge dayNight topicLbl msgCount timeLbl dot statusTxt
    Charts canvases: cTemp cSoil cWind cPress cEdi cPpfd
    Buttons: themeBtn clearBtn
+
+   + NEW MQTT PILL:
+     mqttDot mqttStatusTxt
    ========================================================= */
 
 // ===================== MQTT CONFIG =====================
@@ -28,6 +31,7 @@ function fmt(v, n=1){
   return x.toFixed(n);
 }
 
+// ✅ pill ديال DATA (القديمة)
 function setOnline(ok, msg){
   const dot = $("dot");
   if (dot){
@@ -35,6 +39,20 @@ function setOnline(ok, msg){
     dot.classList.add(ok ? "ok" : "no");
   }
   setText("statusTxt", msg);
+}
+
+// ✅ pill ديال MQTT (الجديدة)
+function setMqttPill(connected){
+  const dot = $("mqttDot");
+  const txt = $("mqttStatusTxt");
+
+  if (dot){
+    dot.classList.remove("ok","no","warn");
+    dot.classList.add(connected ? "ok" : "no");
+  }
+  if (txt){
+    txt.textContent = connected ? "MQTT Connected ✅" : "Disconnected ❌";
+  }
 }
 
 function setPumpBadge(state){
@@ -47,7 +65,6 @@ function setPumpBadge(state){
 }
 
 // ===================== SAFE JSON PARSE =====================
-// Fix invalid JSON like: "lux":nan  -> "lux":null
 function safeParse(raw){
   if (typeof raw !== "string") return null;
 
@@ -148,7 +165,6 @@ function clearCharts(){
 
 // ===================== THEME + CLEAR =====================
 function toggleTheme(){
-  // ما كنبدلوش الديزاين، غير كنبدلو attribute اللي كيتستعمل فـ CSS إلا عندك
   const b = document.body;
   const cur = b.getAttribute("data-theme") || "dark";
   b.setAttribute("data-theme", cur === "light" ? "dark" : "light");
@@ -164,7 +180,6 @@ function hookButtons(){
     msgCount = 0;
     setText("msgCount", msgCount);
     clearCharts();
-    // نخلي آخر رسالة تتصفر باش health-check يبان مزيان
     lastMsgAt = 0;
   });
 }
@@ -174,7 +189,6 @@ let lastMsgAt = 0;
 const NO_DATA_AFTER_MS = 15000;
 
 function setNoDataState(){
-  // dot أصفر
   const dot = $("dot");
   if(dot){
     dot.classList.remove("ok","no");
@@ -183,7 +197,6 @@ function setNoDataState(){
 
   setText("statusTxt", "No data / Device offline");
 
-  // KPIs -> --
   setText("airT","--");
   setText("airRH","--");
   setText("soil","--");
@@ -196,7 +209,6 @@ function setNoDataState(){
 
   setPumpBadge("OFF");
 
-  // subtitles (اختياري)
   setText("soilSub","No data / Sensor disconnected");
   setText("ediSub","No data");
   setText("dayNight","--");
@@ -204,6 +216,7 @@ function setNoDataState(){
 
 // ===================== MQTT CONNECT =====================
 setOnline(false, "Connecting...");
+setMqttPill(false); // ✅ NEW
 
 let msgCount = 0;
 
@@ -217,7 +230,8 @@ const client = mqtt.connect(MQTT_HOST, {
 });
 
 client.on("connect", () => {
-  setOnline(true, "MQTT Connected ✅");
+  setOnline(true, "MQTT Connected ✅"); // (pill القديمة كتبقى بحال ما عندك)
+  setMqttPill(true);                   // ✅ NEW
 
   setText("topicLbl", MQTT_TOPIC);
   setText("msgCount", msgCount);
@@ -228,16 +242,24 @@ client.on("connect", () => {
   client.subscribe(MQTT_TOPIC + "/#", { qos: 0 }, () => {});
 });
 
-client.on("reconnect", () => setOnline(false, "Reconnecting..."));
-client.on("close", () => setOnline(false, "Disconnected"));
+client.on("reconnect", () => {
+  setOnline(false, "Reconnecting...");
+  setMqttPill(false); // ✅ NEW
+});
+
+client.on("close", () => {
+  setOnline(false, "Disconnected");
+  setMqttPill(false); // ✅ NEW
+});
+
 client.on("error", (e) => {
   console.log("MQTT error:", e);
   setOnline(false, "MQTT Error");
+  setMqttPill(false); // ✅ NEW
 });
 
 // ===================== BOOT =====================
 window.addEventListener("load", () => {
-  // theme default
   if (!document.body.getAttribute("data-theme")){
     document.body.setAttribute("data-theme", "dark");
   }
@@ -247,12 +269,9 @@ window.addEventListener("load", () => {
 
 // ===================== MESSAGE HANDLER (ONE ONLY) =====================
 client.on("message", (topic, message) => {
-  lastMsgAt = Date.now(); // ✅ مهم
+  lastMsgAt = Date.now();
 
   const raw = message.toString();
-  // console.log("📩 TOPIC:", topic);
-  // console.log("📩 RAW:", raw);
-
   const d = safeParse(raw);
   if (!d) return;
 
@@ -260,7 +279,6 @@ client.on("message", (topic, message) => {
   setText("msgCount", msgCount);
   setText("topicLbl", topic);
 
-  // ====== Fields from ESP32 (ET0 version) ======
   const airT     = d.air_temp ?? d.temperature;
   const airRH    = d.air_rh ?? d.humidity;
   const soilPct  = d.soil_pct;
@@ -269,11 +287,10 @@ client.on("message", (topic, message) => {
   const pressHpa = d.pressure_hpa;
   const windMs   = d.wind_ms;
   const vpdKpa   = d.vpd;
-  const et0Rate  = d.et0_rate_mm_h ?? d.edi; // fallback
+  const et0Rate  = d.et0_rate_mm_h ?? d.edi;
   const pump     = d.pump ?? "OFF";
   const isDay    = d.is_day;
 
-  // ====== KPIs ======
   setText("airT",  fmt(airT, 1));
   setText("airRH", fmt(airRH, 1));
 
@@ -296,7 +313,6 @@ client.on("message", (topic, message) => {
 
   setText("timeLbl", "Last update: " + new Date().toLocaleTimeString());
 
-  // ====== Charts ======
   const tLabel = new Date().toLocaleTimeString();
   updateChart(charts.temp,  tLabel, airT);
   updateChart(charts.soil,  tLabel, soilPct);
@@ -307,17 +323,15 @@ client.on("message", (topic, message) => {
 });
 
 // ===================== HEALTH CHECK LOOP =====================
-// ✅ هادي هي الزيادة اللي كتخلي "No data" يبان حتى إلا ما وصلات حتى رسالة
 setInterval(() => {
 
-  // إذا ما وصلات حتى رسالة نهائياً
   if (msgCount === 0){
     setNoDataState();
     setText("timeLbl", "Last update: --");
+    // ⚠️ ما كنلمسوش mqttStatusTxt هنا، لأنها مرتبطة ب MQTT connect/close
     return;
   }
 
-  // إذا كان كاين رسائل قبل، ولكن دابا وقفات
   const dt = Date.now() - lastMsgAt;
 
   if (dt > NO_DATA_AFTER_MS){
@@ -332,7 +346,8 @@ setInterval(() => {
       dot.classList.remove("warn","no");
       dot.classList.add("ok");
     }
-    setText("statusTxt", "Live ✅");
+    // ✅ خليها "MQTT Connected" كيفما بغيتي
+    setText("statusTxt", "MQTT Connected ✅");
   }
 
 }, 1000);
