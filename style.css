@@ -245,3 +245,13 @@ h2{
   .charts{ grid-template-columns: 1fr; }
   .chartCard canvas{ height:260px !important; }
 }
+/* ===== Status warning (No data) ===== */
+
+.dot.warn{
+  background: var(--warn);  /* أصفر */
+}
+
+.card.nodata{
+  opacity: 0.9;
+  border-color: rgba(245,158,11,.35);
+}
