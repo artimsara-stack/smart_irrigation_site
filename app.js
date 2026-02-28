@@ -1,17 +1,20 @@
 /* =========================================================
    Smart Irrigation Dashboard — MQTT (EMQX)
-   Works with your HTML IDs:
-   KPIs: airT airRH soil soilUnit soilSub ppfd lux wind press vpd edi ediSub
-        pumpBadge dayNight topicLbl msgCount timeLbl dot statusTxt
-   Charts canvases: cTemp cSoil cWind cPress cEdi cPpfd
-   Buttons: themeBtn clearBtn
+   - 2 Pills:
+      (1) LIVE/DATA   : dot + statusTxt
+      (2) MQTT status : mqttDot + mqttStatusTxt
+   - Works with your HTML IDs:
+     KPIs: airT airRH soil soilUnit soilSub ppfd lux wind press vpd edi ediSub
+          pumpBadge dayNight topicLbl msgCount timeLbl dot statusTxt
+     Charts: cTemp cSoil cWind cPress cEdi cPpfd
+     Buttons: themeBtn clearBtn
    ========================================================= */
 
 // ===================== MQTT CONFIG =====================
 const MQTT_HOST  = "wss://n1122166.ala.eu-central-1.emqxsl.com:8084/mqtt";
 const MQTT_USER  = "sara";
 const MQTT_PASS  = "12345678";
-const MQTT_TOPIC = "smart/irrigation"; // نفس اللي ف ESP32
+const MQTT_TOPIC = "smart/irrigation";
 
 // ===================== DOM HELPERS =====================
 const $ = (id) => document.getElementById(id);
@@ -28,13 +31,23 @@ function fmt(v, n=1){
   return x.toFixed(n);
 }
 
-function setOnline(ok, msg){
-  const dot = $("dot");
-  if (dot){
-    dot.classList.remove("ok","no");
-    dot.classList.add(ok ? "ok" : "no");
-  }
+function setDotState(dotId, state){ // state: "ok" | "no" | "warn"
+  const dot = $(dotId);
+  if (!dot) return;
+  dot.classList.remove("ok","no","warn");
+  if (state) dot.classList.add(state);
+}
+
+// ✅ LIVE/DATA pill
+function setLivePill(state, msg){ // state: ok/no/warn
+  setDotState("dot", state);
   setText("statusTxt", msg);
+}
+
+// ✅ MQTT pill
+function setMqttPill(connected){
+  setDotState("mqttDot", connected ? "ok" : "no");
+  setText("mqttStatusTxt", connected ? "MQTT Connected ✅" : "MQTT Disconnected ❌");
 }
 
 function setPumpBadge(state){
@@ -47,7 +60,6 @@ function setPumpBadge(state){
 }
 
 // ===================== SAFE JSON PARSE =====================
-// Fix invalid JSON like: "lux":nan  -> "lux":null
 function safeParse(raw){
   if (typeof raw !== "string") return null;
 
@@ -122,12 +134,11 @@ function makeLineChart(canvasId, label){
 }
 
 function initCharts(){
-  // canvases IDs from your HTML
   charts.temp  = makeLineChart("cTemp",  "Air Temperature (°C)");
-  charts.soil  = makeLineChart("cSoil",  "Soil (%) / ADC");
+  charts.soil  = makeLineChart("cSoil",  "Soil (%)");
   charts.wind  = makeLineChart("cWind",  "Wind (m/s)");
   charts.press = makeLineChart("cPress", "Pressure (hPa)");
-  charts.edi   = makeLineChart("cEdi",   "EDI / ET0");
+  charts.edi   = makeLineChart("cEdi",   "ET0 rate (mm/h)");
   charts.ppfd  = makeLineChart("cPpfd",  "PPFD");
 }
 
@@ -149,9 +160,9 @@ function clearCharts(){
 
 // ===================== THEME + CLEAR =====================
 function toggleTheme(){
-  const root = document.documentElement;
-  const cur = root.getAttribute("data-theme");
-  root.setAttribute("data-theme", cur === "light" ? "dark" : "light");
+  const b = document.body;
+  const cur = b.getAttribute("data-theme") || "dark";
+  b.setAttribute("data-theme", cur === "light" ? "dark" : "light");
 }
 
 function hookButtons(){
@@ -162,15 +173,44 @@ function hookButtons(){
 
   if (clearBtn) clearBtn.addEventListener("click", () => {
     msgCount = 0;
+    lastMsgAt = 0;
     setText("msgCount", msgCount);
+    setText("timeLbl", "Last update: --");
     clearCharts();
+    setNoDataState(); // باش تبان الحالة مباشرة
   });
 }
 
-// ===================== MQTT CONNECT =====================
-setOnline(false, "Connecting...");
-
+// ===================== DATA HEALTH =====================
 let msgCount = 0;
+let lastMsgAt = 0;
+const NO_DATA_AFTER_MS = 15000;
+
+function setNoDataState(){
+  // LIVE pill => warn
+  setLivePill("warn", "No data / Device offline");
+
+  // KPIs => --
+  setText("airT","--");
+  setText("airRH","--");
+  setText("soil","--");
+  setText("ppfd","--");
+  setText("lux","--");
+  setText("wind","--");
+  setText("press","--");
+  setText("vpd","--");
+  setText("edi","--");
+
+  setPumpBadge("OFF");
+
+  setText("soilSub","No data / Sensor disconnected");
+  setText("ediSub","No data");
+  setText("dayNight","--");
+}
+
+// ===================== MQTT CONNECT =====================
+setLivePill("warn", "Connecting...");
+setMqttPill(false);
 
 const client = mqtt.connect(MQTT_HOST, {
   username: MQTT_USER,
@@ -182,45 +222,48 @@ const client = mqtt.connect(MQTT_HOST, {
 });
 
 client.on("connect", () => {
-  setOnline(true, "MQTT Connected ✅");
-
-  // show topic + msg count in UI
+  setMqttPill(true);
   setText("topicLbl", MQTT_TOPIC);
-  setText("msgCount", msgCount);
+});
 
-  // subscribe exact + wildcard
+client.on("reconnect", () => {
+  setMqttPill(false);
+});
+
+client.on("close", () => {
+  setMqttPill(false);
+});
+
+client.on("error", (e) => {
+  console.log("MQTT error:", e);
+  setMqttPill(false);
+});
+
+// ✅ subscribe after connect (safe)
+client.on("connect", () => {
   client.subscribe(MQTT_TOPIC, { qos: 0 }, (err) => {
-    if (err) setOnline(false, "Subscribe error ❌");
+    if (err) console.log("Subscribe error:", err);
   });
   client.subscribe(MQTT_TOPIC + "/#", { qos: 0 }, () => {});
 });
 
-client.on("reconnect", () => setOnline(false, "Reconnecting..."));
-client.on("close", () => setOnline(false, "Disconnected"));
-client.on("error", (e) => {
-  console.log("MQTT error:", e);
-  setOnline(false, "MQTT Error");
-});
-
 // ===================== BOOT =====================
 window.addEventListener("load", () => {
-  // default theme
-  if (!document.documentElement.getAttribute("data-theme")){
-    document.documentElement.setAttribute("data-theme", "dark");
+  if (!document.body.getAttribute("data-theme")){
+    document.body.setAttribute("data-theme", "dark");
   }
   initCharts();
   hookButtons();
+  setNoDataState(); // default state
+  setText("timeLbl", "Last update: --");
+  setText("msgCount", "0");
 });
 
-// ===================== MESSAGE HANDLER =====================
+// ===================== MESSAGE HANDLER (ONE ONLY) =====================
 client.on("message", (topic, message) => {
+  lastMsgAt = Date.now();
+
   const raw = message.toString();
-
-  // Debug (إلا بغيتي تشوف واش كيوصل message فالبراوزر)
-  // فتح Console: (Mac) Cmd+Option+I ثم Console
-  console.log("📩 TOPIC:", topic);
-  console.log("📩 RAW:", raw);
-
   const d = safeParse(raw);
   if (!d) return;
 
@@ -228,51 +271,48 @@ client.on("message", (topic, message) => {
   setText("msgCount", msgCount);
   setText("topicLbl", topic);
 
-  // ====== Fields from ESP32 (حسب اللي بان ف EMQX) ======
-  const airT     = d.air_temp;
-  const airRH    = d.air_rh;
+  // Fields from ESP32
+  const airT     = d.air_temp ?? d.temperature;
+  const airRH    = d.air_rh ?? d.humidity;
   const soilPct  = d.soil_pct;
   const lux      = d.lux;
   const ppfd     = d.ppfd;
   const pressHpa = d.pressure_hpa;
   const windMs   = d.wind_ms;
   const vpdKpa   = d.vpd;
-  const et0Rate  = d.et0_rate_mm_h;      // نستعملها ف EDI card
+  const et0Rate  = d.et0_rate_mm_h ?? d.edi;
   const pump     = d.pump ?? "OFF";
   const isDay    = d.is_day;
 
-  // ====== KPIs ======
+  // ✅ LIVE pill: data وصلت
+  setLivePill("ok", "Live ✅");
+
+  // KPIs
   setText("airT",  fmt(airT, 1));
   setText("airRH", fmt(airRH, 1));
 
-  // Soil card: % (monitor)
   setText("soil", fmt(soilPct, 1));
   setText("soilUnit", "%");
   setText("soilSub", "Not controlling");
 
-  // Light
   setText("ppfd", fmt(ppfd, 2));
-  setText("lux",  (lux === null || lux === undefined || Number.isNaN(Number(lux))) ? "--" : Math.round(Number(lux)));
+  setText("lux", (lux === null || lux === undefined || Number.isNaN(Number(lux)))
+    ? "--" : Math.round(Number(lux)));
 
-  // Wind / Pressure / VPD
   setText("wind",  fmt(windMs, 2));
   setText("press", fmt(pressHpa, 1));
   setText("vpd",   fmt(vpdKpa, 2));
 
-  // EDI/ET0 card: نخليها ET0_rate باش ما تبقاش خاوية
   setText("edi", fmt(et0Rate, 3));
-  setText("ediSub", "index");
+  setText("ediSub", "ET0 rate (mm/h)");
 
-  // Pump
   setPumpBadge(pump);
   setText("dayNight", (isDay === 1 || isDay === "1") ? "DAY ☀️" : "NIGHT 🌙");
 
-  // Last update
   setText("timeLbl", "Last update: " + new Date().toLocaleTimeString());
 
-  // ====== Charts ======
+  // Charts
   const tLabel = new Date().toLocaleTimeString();
-
   updateChart(charts.temp,  tLabel, airT);
   updateChart(charts.soil,  tLabel, soilPct);
   updateChart(charts.wind,  tLabel, windMs);
@@ -280,3 +320,23 @@ client.on("message", (topic, message) => {
   updateChart(charts.edi,   tLabel, et0Rate);
   updateChart(charts.ppfd,  tLabel, ppfd);
 });
+
+// ===================== HEALTH CHECK LOOP =====================
+setInterval(() => {
+  // MQTT pill ما كنمسّوهش هنا (كيخضع connect/close)
+
+  // إذا ما وصلات حتى رسالة
+  if (msgCount === 0){
+    setNoDataState();
+    setText("timeLbl", "Last update: --");
+    return;
+  }
+
+  // إذا كانت رسائل ووقفو
+  const dt = Date.now() - lastMsgAt;
+
+  if (dt > NO_DATA_AFTER_MS){
+    setNoDataState();
+    setText("timeLbl", "Last update: " + new Date(lastMsgAt).toLocaleTimeString() + " (stale)");
+  }
+}, 1000);
