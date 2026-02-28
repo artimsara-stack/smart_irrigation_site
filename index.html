@@ -5,13 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Smart Irrigation Dashboard</title>
 
-  <!-- CSS ديالك -->
   <link rel="stylesheet" href="style.css">
-
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- MQTT.js -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 
@@ -27,25 +22,16 @@
     </div>
   </div>
 
- <div class="actions">
-  <!-- ✅ PILL ديال LIVE/DATA -->
-  <div class="pill">
-    <span class="dot" id="dot"></span>
-    <span id="statusTxt">Connecting...</span>
+  <div class="actions">
+    <div class="pill">
+      <span class="dot" id="dot"></span>
+      <span id="statusTxt">Connecting...</span>
+    </div>
+    <button class="btn" id="themeBtn" type="button">🌓 Theme</button>
+    <button class="btn" id="clearBtn" type="button">🧹 Clear</button>
   </div>
-
-  <!-- ✅ PILL ديال MQTT CONNECTIVITY -->
-  <div class="pill">
-    <span class="dot" id="mqttDot"></span>
-    <span id="mqttStatusTxt">MQTT: --</span>
-  </div>
-
-  <button class="btn" id="themeBtn" type="button">🌓 Theme</button>
-  <button class="btn" id="clearBtn" type="button">🧹 Clear</button>
-</div>
 </header>
 
-<!-- KPIs -->
 <div class="grid">
 
   <div class="card kpi">
@@ -104,6 +90,24 @@
     <div class="sub" id="dayNight">--</div>
   </div>
 
+  <!-- ✅ NEW: Crop selection (commande MQTT) -->
+  <div class="card kpi">
+    <div class="label">Crop mode</div>
+
+    <div class="sub" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <select id="cropSelect" class="btn" style="padding:8px 10px;">
+        <option value="TOMATO" selected>TOMATO</option>
+        <option value="BERRIES">BERRIES</option>
+      </select>
+
+      <div class="pill" style="padding:6px 10px;">
+        Live: <b id="cropLive">--</b>
+      </div>
+    </div>
+
+    <div class="sub">cmd: <b>smart/irrigation/cmd</b></div>
+  </div>
+
   <div class="card kpi">
     <div class="label">MQTT Topic</div>
     <div class="value" style="font-size:16px;font-weight:700">
@@ -114,7 +118,6 @@
 
 </div>
 
-<!-- Charts -->
 <div class="charts">
 
   <div class="card chartCard">
