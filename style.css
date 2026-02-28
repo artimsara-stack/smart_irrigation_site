@@ -203,7 +203,6 @@ h2{
   gap:12px;
 }
 
-/* كيعطي نفس الإحساس اللي فالصورة: آخر كارتين تحت يسار */
 @media (max-width: 1150px){
   .grid{ grid-template-columns: repeat(4, 1fr); }
 }
@@ -231,7 +230,6 @@ h2{
   font-size:12px;
 }
 
-/* مهم بزاف: إلا كان canvas height = 0 ما غاديش تبان graphe */
 .chartCard canvas{
   width:100% !important;
   height:240px !important;
