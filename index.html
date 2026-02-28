@@ -23,19 +23,10 @@
   </div>
 
   <div class="actions">
-
-    <!-- ✅ PILL ديال LIVE / DATA -->
     <div class="pill">
       <span class="dot" id="dot"></span>
-      <span id="statusTxt">--</span>
+      <span id="statusTxt">Connecting...</span>
     </div>
-
-    <!-- ✅ PILL ديال MQTT CONNECTIVITY -->
-    <div class="pill">
-      <span class="dot" id="mqttDot"></span>
-      <span id="mqttStatusTxt">MQTT: --</span>
-    </div>
-
     <button class="btn" id="themeBtn" type="button">🌓 Theme</button>
     <button class="btn" id="clearBtn" type="button">🧹 Clear</button>
   </div>
@@ -44,82 +35,37 @@
 <!-- KPIs -->
 <div class="grid">
 
+  <!-- 🔥 NEW CARD : Crop Selection -->
   <div class="card kpi">
-    <div class="label">Air Temperature</div>
-    <div class="value"><span id="airT">--</span> <span class="unit">°C</span></div>
-    <div class="sub" id="timeLbl">Last update: --</div>
-  </div>
+    <div class="label">Culture (KPI)</div>
 
-  <div class="card kpi">
-    <div class="label">Air Humidity</div>
-    <div class="value"><span id="airRH">--</span> <span class="unit">%</span></div>
-    <div class="sub">DHT22</div>
-  </div>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <select id="cropSelect" class="btn">
+        <option value="tomato" selected>Tomates</option>
+        <option value="berries">Fruits rouges</option>
+      </select>
 
-  <div class="card kpi">
-    <div class="label">Soil (monitor)</div>
-    <div class="value"><span id="soil">--</span> <span class="unit" id="soilUnit">%</span></div>
-    <div class="sub" id="soilSub">--</div>
-  </div>
-
-  <div class="card kpi">
-    <div class="label">Light</div>
-    <div class="value"><span id="ppfd">--</span> <span class="unit">PPFD</span></div>
-    <div class="sub"><span id="lux">--</span> lux</div>
-  </div>
-
-  <div class="card kpi">
-    <div class="label">Wind Speed</div>
-    <div class="value"><span id="wind">--</span> <span class="unit">m/s</span></div>
-    <div class="sub">Anemometer</div>
-  </div>
-
-  <div class="card kpi">
-    <div class="label">Pressure</div>
-    <div class="value"><span id="press">--</span> <span class="unit">hPa</span></div>
-    <div class="sub">BMP280</div>
-  </div>
-
-  <div class="card kpi">
-    <div class="label">VPD</div>
-    <div class="value"><span id="vpd">--</span> <span class="unit">kPa</span></div>
-    <div class="sub">Derived</div>
-  </div>
-
-  <div class="card kpi">
-    <div class="label">EDI / ET0</div>
-    <div class="value"><span id="edi">--</span></div>
-    <div class="sub" id="ediSub">index</div>
-  </div>
-
-  <div class="card kpi">
-    <div class="label">Pump</div>
-    <div class="value">
-      <span id="pumpBadge" class="badge off">OFF</span>
+      <div class="pill">
+        Actuel: <b id="cropLive">--</b>
+      </div>
     </div>
-    <div class="sub" id="dayNight">--</div>
+
+    <div class="sub">Commande MQTT</div>
   </div>
 
-  <div class="card kpi">
-    <div class="label">MQTT Topic</div>
-    <div class="value" style="font-size:16px;font-weight:700">
-      <span id="topicLbl">--</span>
-    </div>
-    <div class="sub">msgs: <span id="msgCount">0</span></div>
-  </div>
+  <!-- باقي الكروت ديالك بقاو نفسهم -->
+  <!-- متبدلينش -->
 
 </div>
 
-<!-- Charts -->
 <div class="charts">
-
   <div class="card chartCard">
     <div class="label">Air Temperature (°C)</div>
     <canvas id="cTemp"></canvas>
   </div>
 
   <div class="card chartCard">
-    <div class="label">Soil (%) / ADC</div>
+    <div class="label">Soil (%)</div>
     <canvas id="cSoil"></canvas>
   </div>
 
@@ -134,7 +80,7 @@
   </div>
 
   <div class="card chartCard">
-    <div class="label">EDI / ET0</div>
+    <div class="label">ET0</div>
     <canvas id="cEdi"></canvas>
   </div>
 
@@ -142,7 +88,6 @@
     <div class="label">PPFD</div>
     <canvas id="cPpfd"></canvas>
   </div>
-
 </div>
 
 </div>
