@@ -276,7 +276,7 @@ client.on("message", (topic, message) => {
   setText("ppfd", fmt(ppfd, 2));
   setText("lux",  (lux === null || lux === undefined || Number.isNaN(Number(lux))) ? "--" : Math.round(Number(lux)));
 
-  setText("wind",  fmt(windMs, 2));
+  setText("wind", fmt(windKmh, 2));
   setText("press", fmt(pressHpa, 1));
   setText("vpd",   fmt(vpdKpa, 2));
 
