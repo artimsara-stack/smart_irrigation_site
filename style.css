@@ -119,10 +119,6 @@ h2{
   background: var(--bad);
   box-shadow: 0 0 0 3px rgba(239,68,68,.14);
 }
-.dot.warn{
-  background: var(--warn);
-  box-shadow: 0 0 0 3px rgba(245,158,11,.15);
-}
 
 .btn{
   padding:8px 12px;
@@ -207,6 +203,7 @@ h2{
   gap:12px;
 }
 
+/* كيعطي نفس الإحساس اللي فالصورة: آخر كارتين تحت يسار */
 @media (max-width: 1150px){
   .grid{ grid-template-columns: repeat(4, 1fr); }
 }
@@ -234,6 +231,7 @@ h2{
   font-size:12px;
 }
 
+/* مهم بزاف: إلا كان canvas height = 0 ما غاديش تبان graphe */
 .chartCard canvas{
   width:100% !important;
   height:240px !important;
@@ -246,10 +244,4 @@ h2{
 @media (max-width: 860px){
   .charts{ grid-template-columns: 1fr; }
   .chartCard canvas{ height:260px !important; }
-}
-
-/* optional */
-.card.nodata{
-  opacity: 0.9;
-  border-color: rgba(245,158,11,.35);
 }
