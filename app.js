@@ -122,7 +122,10 @@ function makeLineChart(canvasId, label){
 function initCharts(){
   charts.temp  = makeLineChart("cTemp",  "Air Temperature (°C)");
   charts.soil  = makeLineChart("cSoil",  "Soil (%) / ADC");
-  charts.wind  = makeLineChart("cWind",  "Wind (m/s)");
+
+  // ✅ بدلنا label ديال الريح
+  charts.wind  = makeLineChart("cWind",  "Wind (km/h)");
+
   charts.press = makeLineChart("cPress", "Pressure (hPa)");
   charts.edi   = makeLineChart("cEdi",   "ET0 rate (mm/h)");
   charts.ppfd  = makeLineChart("cPpfd",  "PPFD");
@@ -175,10 +178,9 @@ function sendCropCommand(crop){
     return;
   }
 
-  const payload = JSON.stringify({ crop: c }); // {"crop":"TOMATO"} / {"crop":"BERRIES"}
+  const payload = JSON.stringify({ crop: c });
   client.publish(MQTT_CMD_TOPIC, payload, { qos: 0, retain: false });
 
-  // Just info (ESP will confirm in next live msg)
   setOnline(true, "CMD sent: " + c);
 }
 
@@ -205,7 +207,6 @@ function hookButtons(){
 // ===================== MQTT EVENTS =====================
 client.on("connect", () => {
   setOnline(true, "MQTT Connected ✅");
-  
 
   client.subscribe(MQTT_TOPIC, { qos: 0 }, (err) => {
     if (err) setOnline(false, "Subscribe error ❌");
@@ -230,71 +231,86 @@ window.addEventListener("load", () => {
 
 // ===================== MESSAGE HANDLER =====================
 client.on("message", (topic, message) => {
-  const raw = message.toString();
+  try {
+    const raw = message.toString();
 
-  console.log("📩 TOPIC:", topic);
-  console.log("📩 RAW:", raw);
+    console.log("📩 TOPIC:", topic);
+    console.log("📩 RAW:", raw);
 
-  const d = safeParse(raw);
-  if (!d) return;
+    const d = safeParse(raw);
+    if (!d) return;
 
-  msgCount++;
-  setText("msgCount", msgCount);
-  setText("topicLbl", topic);
+    msgCount++;
+    setText("msgCount", msgCount);
+    setText("topicLbl", topic);
 
-  // ====== Fields from ESP32 ======
-  const crop     = d.crop;
-  const airT     = d.air_temp;
-  const airRH    = d.air_rh;
-  const soilPct  = d.soil_pct;
-  const lux      = d.lux;
-  const ppfd     = d.ppfd;
-  const pressHpa = d.pressure_hpa;
-  const windMs   = d.wind_ms;
-  const vpdKpa   = d.vpd;
-  const et0Rate  = d.et0_rate_mm_h;
-  const pump     = d.pump ?? "OFF";
-  const isDay    = d.is_day;
+    // ====== Fields from ESP32 ======
+    const crop     = d.crop;
+    const airT     = d.air_temp;
+    const airRH    = d.air_rh;
+    const soilPct  = d.soil_pct;
+    const lux      = d.lux;
+    const ppfd     = d.ppfd;
+    const pressHpa = d.pressure_hpa;
+    const windMs   = d.wind_ms;
+    const vpdKpa   = d.vpd;
+    const et0Rate  = d.et0_rate_mm_h;
+    const pump     = d.pump ?? "OFF";
+    const isDay    = d.is_day;
 
-  // ====== Crop live + sync select ======
-  if (crop){
-    setText("cropLive", crop);
-    const cropSel = $("cropSelect");
-    if (cropSel && (crop === "TOMATO" || crop === "BERRIES") && cropSel.value !== crop){
-      cropSel.value = crop;
+    // ✅ تحويل الريح: m/s -> km/h
+    const windKmh = (windMs === null || windMs === undefined || Number.isNaN(Number(windMs)))
+      ? null
+      : Number(windMs) * 3.6;
+
+    // ====== Crop live + sync select ======
+    if (crop){
+      setText("cropLive", crop);
+      const cropSel = $("cropSelect");
+      if (cropSel && (crop === "TOMATO" || crop === "BERRIES") && cropSel.value !== crop){
+        cropSel.value = crop;
+      }
     }
+
+    // ====== KPIs ======
+    setText("airT",  fmt(airT, 1));
+    setText("airRH", fmt(airRH, 1));
+
+    setText("soil", fmt(soilPct, 1));
+    setText("soilUnit", "%");
+    setText("soilSub", "Not controlling");
+
+    setText("ppfd", fmt(ppfd, 2));
+    setText("lux",  (lux === null || lux === undefined || Number.isNaN(Number(lux))) ? "--" : Math.round(Number(lux)));
+
+    // ✅ هنا كان كيطاح الكود (windKmh)
+    setText("wind", fmt(windKmh, 2));
+
+    setText("press", fmt(pressHpa, 1));
+    setText("vpd",   fmt(vpdKpa, 2));
+
+    setText("edi", fmt(et0Rate, 4));
+    setText("ediSub", "ET0 rate (mm/h)");
+
+    setPumpBadge(pump);
+    setText("dayNight", (isDay === 1 || isDay === "1") ? "DAY ☀️" : "NIGHT 🌙");
+
+    setText("timeLbl", "Last update: " + new Date().toLocaleTimeString());
+
+    // ====== Charts ======
+    const tLabel = new Date().toLocaleTimeString();
+
+    updateChart(charts.temp,  tLabel, airT);
+    updateChart(charts.soil,  tLabel, soilPct);
+
+    // ✅ chart ديال الريح خاصو km/h
+    updateChart(charts.wind,  tLabel, windKmh);
+
+    updateChart(charts.press, tLabel, pressHpa);
+    updateChart(charts.edi,   tLabel, et0Rate);
+    updateChart(charts.ppfd,  tLabel, ppfd);
+
+  } catch (err){
+    console.error("❌ message handler crashed:", err);
   }
-
-  // ====== KPIs ======
-  setText("airT",  fmt(airT, 1));
-  setText("airRH", fmt(airRH, 1));
-
-  setText("soil", fmt(soilPct, 1));
-  setText("soilUnit", "%");
-  setText("soilSub", "Not controlling");
-
-  setText("ppfd", fmt(ppfd, 2));
-  setText("lux",  (lux === null || lux === undefined || Number.isNaN(Number(lux))) ? "--" : Math.round(Number(lux)));
-
-  setText("wind", fmt(windKmh, 2));
-  setText("press", fmt(pressHpa, 1));
-  setText("vpd",   fmt(vpdKpa, 2));
-
-  setText("edi", fmt(et0Rate, 4));
-  setText("ediSub", "ET0 rate (mm/h)");
-
-  setPumpBadge(pump);
-  setText("dayNight", (isDay === 1 || isDay === "1") ? "DAY ☀️" : "NIGHT 🌙");
-
-  setText("timeLbl", "Last update: " + new Date().toLocaleTimeString());
-
-  // ====== Charts ======
-  const tLabel = new Date().toLocaleTimeString();
-
-  updateChart(charts.temp,  tLabel, airT);
-  updateChart(charts.soil,  tLabel, soilPct);
-  updateChart(charts.wind,  tLabel, windMs);
-  updateChart(charts.press, tLabel, pressHpa);
-  updateChart(charts.edi,   tLabel, et0Rate);
-  updateChart(charts.ppfd,  tLabel, ppfd);
 });
