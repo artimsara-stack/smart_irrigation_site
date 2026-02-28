@@ -5,8 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Smart Irrigation Dashboard</title>
 
+  <!-- CSS ديالك -->
   <link rel="stylesheet" href="style.css">
+
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- MQTT.js -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 
@@ -18,7 +23,7 @@
     <div class="logo"></div>
     <div>
       <h2>Smart Irrigation</h2>
-     <div class="subtitle"></div>
+      <div class="subtitle">ESP32 → MQTT → EMQX</div>
     </div>
   </div>
 
@@ -27,11 +32,19 @@
       <span class="dot" id="dot"></span>
       <span id="statusTxt">Connecting...</span>
     </div>
+
+    <!-- ✅ Crop selection (نفس ديزاين btn) -->
+    <select class="btn" id="cropSelect">
+      <option value="TOMATO">🍅 Tomato</option>
+      <option value="BERRIES">🍓 Red berries</option>
+    </select>
+
     <button class="btn" id="themeBtn" type="button">🌓 Theme</button>
     <button class="btn" id="clearBtn" type="button">🧹 Clear</button>
   </div>
 </header>
 
+<!-- KPIs -->
 <div class="grid">
 
   <div class="card kpi">
@@ -58,6 +71,7 @@
     <div class="sub"><span id="lux">--</span> lux</div>
   </div>
 
+  <!-- ✅ Wind now in km/h -->
   <div class="card kpi">
     <div class="label">Wind Speed</div>
     <div class="value"><span id="wind">--</span> <span class="unit">km/h</span></div>
@@ -77,9 +91,9 @@
   </div>
 
   <div class="card kpi">
-    <div class="label">EDI / ET0</div>
-    <div class="value"><span id="edi">--</span></div>
-    <div class="sub" id="ediSub">index</div>
+    <div class="label">ET0 (rate)</div>
+    <div class="value"><span id="edi">--</span> <span class="unit">mm/h</span></div>
+    <div class="sub" id="ediSub">--</div>
   </div>
 
   <div class="card kpi">
@@ -90,27 +104,26 @@
     <div class="sub" id="dayNight">--</div>
   </div>
 
-  <!-- ✅ NEW: Crop selection (commande MQTT) -->
+  <!-- ✅ Rain KPI card -->
   <div class="card kpi">
-    <div class="label">Crop mode</div>
-
-    <div class="sub" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-      <select id="cropSelect" class="btn" style="padding:8px 10px;">
-        <option value="TOMATO" selected>TOMATO</option>
-        <option value="BERRIES">BERRIES</option>
-      </select>
-
-      <div class="pill" style="padding:6px 10px;">
-        Live: <b id="cropLive">--</b>
-      </div>
+    <div class="label">Rain</div>
+    <div class="value">
+      <span id="rainState">--</span> <span class="unit" id="rainUnit">--</span>
     </div>
-
-    <div class="sub">cmd: <b>smart/irrigation/cmd</b></div>
+    <div class="sub" id="rainSub">--</div>
   </div>
 
-  
+  <div class="card kpi">
+    <div class="label">MQTT Topic</div>
+    <div class="value" style="font-size:16px;font-weight:700">
+      <span id="topicLbl">--</span>
+    </div>
+    <div class="sub">msgs: <span id="msgCount">0</span> • crop: <span id="cropLbl">--</span></div>
+  </div>
+
 </div>
 
+<!-- Charts -->
 <div class="charts">
 
   <div class="card chartCard">
@@ -119,7 +132,7 @@
   </div>
 
   <div class="card chartCard">
-    <div class="label">Soil (%) / ADC</div>
+    <div class="label">Soil (%)</div>
     <canvas id="cSoil"></canvas>
   </div>
 
@@ -134,7 +147,7 @@
   </div>
 
   <div class="card chartCard">
-    <div class="label">EDI / ET0</div>
+    <div class="label">ET0 rate (mm/h)</div>
     <canvas id="cEdi"></canvas>
   </div>
 
