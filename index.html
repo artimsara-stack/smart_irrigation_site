@@ -27,14 +27,22 @@
     </div>
   </div>
 
-  <div class="actions">
-    <div class="pill">
-      <span class="dot" id="dot"></span>
-      <span id="statusTxt">Connecting...</span>
-    </div>
-    <button class="btn" id="themeBtn" type="button">🌓 Theme</button>
-    <button class="btn" id="clearBtn" type="button">🧹 Clear</button>
+ <div class="actions">
+  <!-- ✅ PILL ديال LIVE/DATA -->
+  <div class="pill">
+    <span class="dot" id="dot"></span>
+    <span id="statusTxt">Connecting...</span>
   </div>
+
+  <!-- ✅ PILL ديال MQTT CONNECTIVITY -->
+  <div class="pill">
+    <span class="dot" id="mqttDot"></span>
+    <span id="mqttStatusTxt">MQTT: --</span>
+  </div>
+
+  <button class="btn" id="themeBtn" type="button">🌓 Theme</button>
+  <button class="btn" id="clearBtn" type="button">🧹 Clear</button>
+</div>
 </header>
 
 <!-- KPIs -->
