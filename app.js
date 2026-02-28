@@ -1,15 +1,16 @@
 /* =========================================================
    Smart Irrigation Dashboard — MQTT (EMQX)
    + Crop selection command -> smart/irrigation/cmd
-   + Rain card (state + duration + lock + AO)
+   + Rain window (state + elapsed + lock)
+   + Wind displayed in km/h
    ========================================================= */
 
 // ===================== MQTT CONFIG =====================
-const MQTT_HOST     = "wss://n1122166.ala.eu-central-1.emqxsl.com:8084/mqtt";
-const MQTT_USER     = "sara";
-const MQTT_PASS     = "12345678";
-const MQTT_TOPIC    = "smart/irrigation";        // ESP32 publish
-const MQTT_CMD_TOPIC= "smart/irrigation/cmd";    // dashboard -> ESP32 command
+const MQTT_HOST  = "wss://n1122166.ala.eu-central-1.emqxsl.com:8084/mqtt";
+const MQTT_USER  = "sara";
+const MQTT_PASS  = "12345678";
+const MQTT_TOPIC = "smart/irrigation";
+const MQTT_CMD_TOPIC = "smart/irrigation/cmd";
 
 // ===================== DOM HELPERS =====================
 const $ = (id) => document.getElementById(id);
@@ -44,8 +45,26 @@ function setPumpBadge(state){
   b.classList.toggle("off", !isOn);
 }
 
+function setRainBadge(isRaining){
+  const b = $("rainBadge");
+  if (!b) return;
+  const wet = (isRaining === 1 || isRaining === "1" || isRaining === true);
+  b.textContent = wet ? "RAIN" : "DRY";
+  b.classList.toggle("on", wet);   // green
+  b.classList.toggle("off", !wet); // red
+}
+
+function showCmdSent(text){
+  const pill = $("cmdPill");
+  const t = $("cmdTxt");
+  if (!pill || !t) return;
+  t.textContent = text;
+  pill.style.display = "flex";
+  clearTimeout(showCmdSent._t);
+  showCmdSent._t = setTimeout(()=> pill.style.display = "none", 2200);
+}
+
 // ===================== SAFE JSON PARSE =====================
-// Fix invalid JSON like: "lux":nan  -> "lux":null
 function safeParse(raw){
   if (typeof raw !== "string") return null;
 
@@ -58,10 +77,7 @@ function safeParse(raw){
   try {
     return JSON.parse(cleaned);
   } catch(e){
-    console.log("❌ JSON parse failed");
-    console.log("RAW    =", raw);
-    console.log("CLEANED=", cleaned);
-    console.log(e);
+    console.log("❌ JSON parse failed", e);
     return null;
   }
 }
@@ -121,10 +137,10 @@ function makeLineChart(canvasId, label){
 
 function initCharts(){
   charts.temp  = makeLineChart("cTemp",  "Air Temperature (°C)");
-  charts.soil  = makeLineChart("cSoil",  "Soil (%)");
+  charts.soil  = makeLineChart("cSoil",  "Soil (%) / ADC");
   charts.wind  = makeLineChart("cWind",  "Wind (km/h)");
   charts.press = makeLineChart("cPress", "Pressure (hPa)");
-  charts.edi   = makeLineChart("cEdi",   "ET0 rate (mm/h)");
+  charts.edi   = makeLineChart("cEdi",   "EDI / ET0");
   charts.ppfd  = makeLineChart("cPpfd",  "PPFD");
 }
 
@@ -164,31 +180,6 @@ function hookButtons(){
   });
 }
 
-// ===================== CROP SELECTION (COMMAND) =====================
-function hookCropSelect(){
-  const sel = $("cropSelect");
-  if (!sel) return;
-
-  sel.addEventListener("change", () => {
-    const crop = sel.value; // "TOMATO" or "BERRIES"
-    if (!client || !client.connected) return;
-
-    const payload = JSON.stringify({ crop });
-    client.publish(MQTT_CMD_TOPIC, payload, { qos: 0, retain: true }, (err) => {
-      if (err) console.log("❌ publish cmd error:", err);
-      else console.log("✅ crop cmd sent:", payload);
-    });
-  });
-}
-
-function syncCropSelectFromESP(cropText){
-  const sel = $("cropSelect");
-  if (!sel) return;
-  const up = String(cropText || "").toUpperCase();
-  if (up.includes("BERR")) sel.value = "BERRIES";
-  else if (up.includes("TOM")) sel.value = "TOMATO";
-}
-
 // ===================== MQTT CONNECT =====================
 setOnline(false, "Connecting...");
 
@@ -203,27 +194,14 @@ const client = mqtt.connect(MQTT_HOST, {
   reconnectPeriod: 2500,
 });
 
-// ===================== BOOT =====================
-window.addEventListener("load", () => {
-  if (!document.documentElement.getAttribute("data-theme")){
-    document.documentElement.setAttribute("data-theme", "dark");
-  }
-  initCharts();
-  hookButtons();
-  hookCropSelect();
-});
-
 client.on("connect", () => {
   setOnline(true, "MQTT Connected ✅");
-
   setText("topicLbl", MQTT_TOPIC);
   setText("msgCount", msgCount);
 
   client.subscribe(MQTT_TOPIC, { qos: 0 }, (err) => {
     if (err) setOnline(false, "Subscribe error ❌");
   });
-
-  // optional wildcard
   client.subscribe(MQTT_TOPIC + "/#", { qos: 0 }, () => {});
 });
 
@@ -234,12 +212,38 @@ client.on("error", (e) => {
   setOnline(false, "MQTT Error");
 });
 
+// ===================== CROP SELECT (send command) =====================
+function hookCropSelect(){
+  const sel = $("cropSelect");
+  if (!sel) return;
+
+  sel.addEventListener("change", () => {
+    const crop = sel.value; // TOMATO / BERRIES
+    const payload = JSON.stringify({ crop });
+
+    client.publish(MQTT_CMD_TOPIC, payload, { qos: 0, retain: false }, (err) => {
+      if (err) {
+        showCmdSent("CMD failed ❌");
+      } else {
+        showCmdSent("CMD sent: " + crop);
+      }
+    });
+  });
+}
+
+// ===================== BOOT =====================
+window.addEventListener("load", () => {
+  if (!document.documentElement.getAttribute("data-theme")){
+    document.documentElement.setAttribute("data-theme", "dark");
+  }
+  initCharts();
+  hookButtons();
+  hookCropSelect();
+});
+
 // ===================== MESSAGE HANDLER =====================
 client.on("message", (topic, message) => {
   const raw = message.toString();
-  console.log("📩 TOPIC:", topic);
-  console.log("📩 RAW:", raw);
-
   const d = safeParse(raw);
   if (!d) return;
 
@@ -252,29 +256,22 @@ client.on("message", (topic, message) => {
   const airT     = d.air_temp;
   const airRH    = d.air_rh;
   const soilPct  = d.soil_pct;
-
   const lux      = d.lux;
   const ppfd     = d.ppfd;
-
   const pressHpa = d.pressure_hpa;
 
-  // wind in km/h (preferred) + fallback to ms*3.6
-  const windKmh  = (d.wind_kmh !== undefined && d.wind_kmh !== null) ? d.wind_kmh : (
-    (d.wind_ms !== undefined && d.wind_ms !== null) ? (Number(d.wind_ms) * 3.6) : null
-  );
+  // ✅ wind in km/h (from ESP32)
+  const windKmh  = (d.wind_kmh !== undefined) ? d.wind_kmh : (Number(d.wind_ms) * 3.6);
 
   const vpdKpa   = d.vpd;
   const et0Rate  = d.et0_rate_mm_h;
-  const et0Daily = d.et0_daily_est_mm;
-
   const pump     = d.pump ?? "OFF";
   const isDay    = d.is_day;
 
-  // rain
-  const isRaining   = d.is_raining;         // 0/1
-  const rainAO      = d.rain_ao;            // ADC
-  const rainLockMin = d.rain_lock_min;      // minutes
-  const rainDurMin  = d.rain_duration_min;  // ✅ from ESP
+  // ✅ rain
+  const isRaining = d.is_raining;
+  const rainElapsedS = d.rain_elapsed_s;
+  const rainLockMin  = d.rain_lock_min;
 
   // ====== KPIs ======
   setText("airT",  fmt(airT, 1));
@@ -284,49 +281,37 @@ client.on("message", (topic, message) => {
   setText("soilUnit", "%");
   setText("soilSub", "Not controlling");
 
-  // Light
-  const ppfdNum = Number(ppfd);
-  setText("ppfd", (ppfd === null || ppfd === undefined || Number.isNaN(ppfdNum) || ppfdNum < 0) ? "--" : fmt(ppfdNum, 2));
+  setText("ppfd", fmt(ppfd, 2));
+  setText("lux",  (lux === null || lux === undefined || Number.isNaN(Number(lux))) ? "--" : Math.round(Number(lux)));
 
-  const luxNum = Number(lux);
-  setText("lux",  (lux === null || lux === undefined || Number.isNaN(luxNum) || luxNum < 0) ? "--" : Math.round(luxNum));
-
-  // Wind / Pressure / VPD
-  setText("wind",  fmt(windKmh, 1));
+  setText("wind",  fmt(windKmh, 2));
   setText("press", fmt(pressHpa, 1));
   setText("vpd",   fmt(vpdKpa, 2));
 
-  // ET0
+  // EDI/ET0 card
+  // إذا كان NaN فالليل، كيبان "--" (هذا عادي)
   setText("edi", fmt(et0Rate, 3));
-  setText("ediSub", `daily≈ ${fmt(et0Daily, 2)} mm/d`);
+  setText("ediSub", "ET0 rate (mm/h)");
 
   // Pump
   setPumpBadge(pump);
   setText("dayNight", (isDay === 1 || isDay === "1") ? "DAY ☀️" : "NIGHT 🌙");
 
-  // Crop label + sync select
-  setText("cropLbl", crop || "--");
-  if (crop) syncCropSelectFromESP(crop);
+  // Rain UI
+  setRainBadge(isRaining);
+  const minutes = (rainElapsedS && !Number.isNaN(Number(rainElapsedS))) ? Math.floor(Number(rainElapsedS)/60) : 0;
+  setText("rainElapsed", minutes);
+  setText("rainLock", (rainLockMin ?? 0));
+
+  // Crop UI (live from ESP32)
+  if (crop){
+    setText("cropLive", crop);
+    const sel = $("cropSelect");
+    if (sel && (sel.value !== crop)) sel.value = crop; // sync UI
+  }
 
   // Last update
   setText("timeLbl", "Last update: " + new Date().toLocaleTimeString());
-
-  // ===== Rain Card =====
-  const raining = (isRaining === 1 || isRaining === "1" || isRaining === true);
-  setText("rainState", raining ? "RAIN" : "NO RAIN");
-  setText("rainUnit",  raining ? "🌧️" : "☀️");
-
-  let sub = `AO: ${rainAO ?? "--"}`;
-  const dur = Number(rainDurMin);
-  if (raining) {
-    sub += ` • Duration: ${(!Number.isNaN(dur) ? dur : "--")} min`;
-  } else {
-    // show last known duration if provided
-    if (!Number.isNaN(dur) && dur > 0) sub += ` • Last: ${dur} min`;
-    const lock = Number(rainLockMin);
-    sub += ` • Lock: ${(!Number.isNaN(lock) ? lock : "--")} min`;
-  }
-  setText("rainSub", sub);
 
   // ====== Charts ======
   const tLabel = new Date().toLocaleTimeString();
@@ -335,5 +320,5 @@ client.on("message", (topic, message) => {
   updateChart(charts.wind,  tLabel, windKmh);
   updateChart(charts.press, tLabel, pressHpa);
   updateChart(charts.edi,   tLabel, et0Rate);
-  updateChart(charts.ppfd,  tLabel, (ppfdNum < 0 ? null : ppfdNum));
+  updateChart(charts.ppfd,  tLabel, ppfd);
 });
