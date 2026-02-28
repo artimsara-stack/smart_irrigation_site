@@ -205,8 +205,7 @@ function hookButtons(){
 // ===================== MQTT EVENTS =====================
 client.on("connect", () => {
   setOnline(true, "MQTT Connected ✅");
-  setText("topicLbl", MQTT_TOPIC);
-  setText("msgCount", msgCount);
+  
 
   client.subscribe(MQTT_TOPIC, { qos: 0 }, (err) => {
     if (err) setOnline(false, "Subscribe error ❌");
