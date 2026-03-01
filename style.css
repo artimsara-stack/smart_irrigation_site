@@ -243,21 +243,3 @@ h2{
   .charts{ grid-template-columns: 1fr; }
   .chartCard canvas{ height:260px !important; }
 }
-/* ====== Selection (Crop mode) — added without changing design ====== */
-.select{
-  width: 100%;
-  max-width: 220px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: rgba(255,255,255,.03);
-  color: var(--text);
-  font-weight: 800;
-  font-size: 14px;
-  outline: none;
-  box-shadow: 0 10px 28px rgba(0,0,0,.18);
-}
-
-.select option{
-  color: #0b1220;
-}
