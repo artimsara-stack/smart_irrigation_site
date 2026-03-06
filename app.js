@@ -366,31 +366,33 @@ client.on("message", (topic, message) => {
 
   msgCount++;
 
-  const crop     = d.crop;
-  const airT     = d.air_temp;
-  const airRH    = d.air_rh;
-  const soilPct  = d.soil_pct;
-  const lux      = d.lux;
-  const ppfd     = d.ppfd;
-  const pressHpa = d.pressure_hpa;
+  const crop         = d.crop;
+  const airT         = d.air_temp;
+  const airRH        = d.air_rh;
+  const soilPct      = d.soil_pct;
+  const lux          = d.lux;
+  const ppfd         = d.ppfd;
+  const pressHpa     = d.pressure_hpa;
 
-  const windKmh  = (d.wind_kmh !== undefined && d.wind_kmh !== null)
+  const windKmh      = (d.wind_kmh !== undefined && d.wind_kmh !== null)
     ? d.wind_kmh
     : ((d.wind_ms !== undefined && d.wind_ms !== null) ? (Number(d.wind_ms) * 3.6) : null);
 
-  const vpdKpa   = d.vpd;
-  const et0Rate  = d.et0_rate_mm_h;
-  const et0Daily = d.et0_daily_est_mm;
-  const pump     = d.pump ?? "OFF";
-  const isDay    = d.is_day;
-  const pulsesDone  = d.pulses_done;
-  const pulsesTareget =d.pulses_target;
+  const vpdKpa       = d.vpd;
+  const et0Rate      = d.et0_rate_mm_h;
+  const et0Daily     = d.et0_daily_est_mm;
 
-  const isRaining   = d.is_raining;
-  const rainAO      = d.rain_ao;
-  const rainLockMin = d.rain_lock_min;
-  const rainDurMin  = d.rain_duration_min;
+  const pump         = d.pump ?? "OFF";
+  const isDay        = d.is_day;
+  const pulsesDone   = d.pulses_done;
+  const pulsesTarget = d.pulses_target;
 
+  const isRaining    = d.is_raining;
+  const rainAO       = d.rain_ao;
+  const rainLockMin  = d.rain_lock_min;
+  const rainDurMin   = d.rain_duration_min;
+
+  // ===== KPIs =====
   setText("airT",  fmt(airT, 1));
   setText("airRH", fmt(airRH, 1));
 
@@ -402,7 +404,7 @@ client.on("message", (topic, message) => {
   setText("ppfd", (ppfd === null || ppfd === undefined || Number.isNaN(ppfdNum) || ppfdNum < 0) ? "--" : fmt(ppfdNum, 2));
 
   const luxNum = Number(lux);
-  setText("lux",  (lux === null || lux === undefined || Number.isNaN(luxNum) || luxNum < 0) ? "--" : Math.round(luxNum));
+  setText("lux", (lux === null || lux === undefined || Number.isNaN(luxNum) || luxNum < 0) ? "--" : Math.round(luxNum));
 
   setText("wind",  fmt(windKmh, 1));
   setText("press", fmt(pressHpa, 1));
@@ -411,26 +413,30 @@ client.on("message", (topic, message) => {
   setText("edi", fmt(et0Rate, 3));
   setText("ediSub", `daily≈ ${fmt(et0Daily, 2)} mm/d`);
 
+  // ===== Pump badge + daily cycles =====
   setPumpBadge(pump);
+
   const dayTxt = (isDay === 1 || isDay === "1") ? "DAY ☀️" : "NIGHT 🌙";
 
-let cyclesTxt = "";
-const doneOk = pulsesDone !== undefined && pulsesDone !== null && !Number.isNaN(Number(pulsesDone));
-const targetOk = pulsesTarget !== undefined && pulsesTarget !== null && !Number.isNaN(Number(pulsesTarget));
+  let cyclesTxt = "";
+  const doneOk = pulsesDone !== undefined && pulsesDone !== null && !Number.isNaN(Number(pulsesDone));
+  const targetOk = pulsesTarget !== undefined && pulsesTarget !== null && !Number.isNaN(Number(pulsesTarget));
 
-if (doneOk && targetOk) {
-  cyclesTxt = ` • Cycles: ${pulsesDone}/${pulsesTarget}`;
-} else if (doneOk) {
-  cyclesTxt = ` • Cycles: ${pulsesDone}`;
-}
+  if (doneOk && targetOk) {
+    cyclesTxt = ` • Cycles: ${pulsesDone}/${pulsesTarget}`;
+  } else if (doneOk) {
+    cyclesTxt = ` • Cycles: ${pulsesDone}`;
+  }
 
-setText("dayNight", dayTxt + cyclesTxt);
+  setText("dayNight", dayTxt + cyclesTxt);
 
-  setText("cropLbl", crop || "--");
+  // ===== Crop =====
   if (crop) syncCropSelectFromESP(crop);
 
+  // ===== Last update =====
   setText("timeLbl", "Last update: " + new Date().toLocaleTimeString());
 
+  // ===== Rain =====
   const raining = (isRaining === 1 || isRaining === "1" || isRaining === true);
   setText("rainState", raining ? "RAIN" : "NO RAIN");
   setText("rainUnit",  raining ? "🌧️" : "☀️");
@@ -446,6 +452,7 @@ setText("dayNight", dayTxt + cyclesTxt);
   }
   setText("rainSub", sub);
 
+  // ===== Charts =====
   const tLabel = new Date().toLocaleTimeString();
   updateChart(charts.temp,  tLabel, airT);
   updateChart(charts.soil,  tLabel, soilPct);
