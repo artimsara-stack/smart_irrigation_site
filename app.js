@@ -412,9 +412,17 @@ client.on("message", (topic, message) => {
 
   setPumpBadge(pump);
   const dayTxt = (isDay === 1 || isDay === "1") ? "DAY ☀️" : "NIGHT 🌙";
-const cyclesTxt = (pulsesDone !== undefined && pulsesDone !== null && !Number.isNaN(Number(pulsesDone)))
-  ? ` • Cycles: ${pulsesDone}`
-  : "";
+
+let cyclesTxt = "";
+const doneOk = pulsesDone !== undefined && pulsesDone !== null && !Number.isNaN(Number(pulsesDone));
+const targetOk = pulsesTarget !== undefined && pulsesTarget !== null && !Number.isNaN(Number(pulsesTarget));
+
+if (doneOk && targetOk) {
+  cyclesTxt = ` • Cycles: ${pulsesDone}/${pulsesTarget}`;
+} else if (doneOk) {
+  cyclesTxt = ` • Cycles: ${pulsesDone}`;
+}
+
 setText("dayNight", dayTxt + cyclesTxt);
 
   setText("cropLbl", crop || "--");
