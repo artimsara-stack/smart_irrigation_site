@@ -384,6 +384,7 @@ client.on("message", (topic, message) => {
   const pump     = d.pump ?? "OFF";
   const isDay    = d.is_day;
   const pulsesDone  = d.pulses_done;
+  const pulsesTareget =d.pulses_target;
 
   const isRaining   = d.is_raining;
   const rainAO      = d.rain_ao;
