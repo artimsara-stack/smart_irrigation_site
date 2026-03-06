@@ -383,6 +383,7 @@ client.on("message", (topic, message) => {
   const et0Daily = d.et0_daily_est_mm;
   const pump     = d.pump ?? "OFF";
   const isDay    = d.is_day;
+  const pulsesDone  = d.pulses_done;
 
   const isRaining   = d.is_raining;
   const rainAO      = d.rain_ao;
@@ -410,7 +411,11 @@ client.on("message", (topic, message) => {
   setText("ediSub", `daily≈ ${fmt(et0Daily, 2)} mm/d`);
 
   setPumpBadge(pump);
-  setText("dayNight", (isDay === 1 || isDay === "1") ? "DAY ☀️" : "NIGHT 🌙");
+  const dayTxt = (isDay === 1 || isDay === "1") ? "DAY ☀️" : "NIGHT 🌙";
+const cyclesTxt = (pulsesDone !== undefined && pulsesDone !== null && !Number.isNaN(Number(pulsesDone)))
+  ? ` • Cycles: ${pulsesDone}`
+  : "";
+setText("dayNight", dayTxt + cyclesTxt);
 
   setText("cropLbl", crop || "--");
   if (crop) syncCropSelectFromESP(crop);
