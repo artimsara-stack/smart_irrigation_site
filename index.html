@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Smart Irrigation Dashboard</title>
 
-  <!-- CSS ديالك -->
   <link rel="stylesheet" href="style.css">
 
   <!-- Chart.js -->
@@ -13,6 +12,29 @@
 
   <!-- MQTT.js -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      databaseURL: "https://smart-irrigation-site-90e51-default-rtdb.firebaseio.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_STORAGE_BUCKET",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    window.firebaseDb = db;
+    window.firebaseRef = ref;
+    window.firebaseGet = get;
+  </script>
 </head>
 
 <body>
@@ -23,7 +45,6 @@
     <div class="logo"></div>
     <div>
       <h2>Smart Irrigation</h2>
-    <!-- <div class="subtitle">ESP32 → MQTT → EMQX</div> -->
     </div>
   </div>
 
@@ -33,16 +54,53 @@
       <span id="statusTxt">Connecting...</span>
     </div>
 
-    <!-- ✅ Crop selection (نفس ديزاين btn) -->
     <select class="btn" id="cropSelect">
       <option value="TOMATO">🍅 Tomato</option>
       <option value="BERRIES">🍓 Red berries</option>
     </select>
 
+    <button class="btn" id="historyBtn" type="button">📅 History</button>
     <button class="btn" id="themeBtn" type="button">🌓 Theme</button>
     <button class="btn" id="clearBtn" type="button">🧹 Clear</button>
   </div>
 </header>
+
+<!-- HISTORY PANEL -->
+<div class="card" id="historyPanel" style="display:none; padding:14px; margin-bottom:14px;">
+  <div class="label" style="margin-bottom:10px;">Historical Data</div>
+
+  <div class="actions" style="margin-bottom:12px;">
+    <select class="btn" id="monthSelect">
+      <option value="">Select month</option>
+    </select>
+
+    <input type="date" class="btn" id="dayPicker" />
+
+    <button class="btn" id="loadHistoryBtn" type="button">Load</button>
+  </div>
+
+  <div id="historyEmpty" class="sub" style="display:none;">
+    No historical data for this selection.
+  </div>
+
+  <div id="historyTableWrap" style="display:none; overflow-x:auto;">
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th>Interval</th>
+          <th>Air Temp (°C)</th>
+          <th>Air RH (%)</th>
+          <th>Light (PPFD)</th>
+          <th>Wind (km/h)</th>
+          <th>Pressure (hPa)</th>
+          <th>Rain (%)</th>
+          <th>Pump (%)</th>
+        </tr>
+      </thead>
+      <tbody id="historyTableBody"></tbody>
+    </table>
+  </div>
+</div>
 
 <!-- KPIs -->
 <div class="grid">
@@ -71,7 +129,6 @@
     <div class="sub"><span id="lux">--</span> lux</div>
   </div>
 
-  <!-- ✅ Wind now in km/h -->
   <div class="card kpi">
     <div class="label">Wind Speed</div>
     <div class="value"><span id="wind">--</span> <span class="unit">km/h</span></div>
@@ -104,7 +161,6 @@
     <div class="sub" id="dayNight">--</div>
   </div>
 
-  <!-- ✅ Rain KPI card -->
   <div class="card kpi">
     <div class="label">Rain</div>
     <div class="value">
@@ -112,8 +168,6 @@
     </div>
     <div class="sub" id="rainSub">--</div>
   </div>
-
-  
 
 </div>
 
