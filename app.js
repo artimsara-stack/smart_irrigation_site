@@ -12,13 +12,7 @@ const MQTT_TOPIC     = "smart/irrigation";
 const MQTT_CMD_TOPIC = "smart/irrigation/cmd";
 
 // ===================== DOM HELPERS =====================
-document.addEventListener("click", () => {
-  const alarm = document.getElementById("alarmSound");
-  if (alarm) alarm.play().then(() => alarm.pause()).catch(()=>{});
-});
 const $ = (id) => document.getElementById(id);
-const alarm = document.getElementById("alarmSound");
-let alarmActive = false;
 
 function setText(id, v){
   const n = $(id);
@@ -397,60 +391,7 @@ client.on("message", (topic, message) => {
   const rainAO       = d.rain_ao;
   const rainLockMin  = d.rain_lock_min;
   const rainDurMin   = d.rain_duration_min;
-let alerts = [];
 
-if (airT !== null && airT !== undefined && !Number.isNaN(Number(airT)) && Number(airT) > 32) {
-  alerts.push("⚠ High temperature");
-}
-
-if (airRH !== null && airRH !== undefined && !Number.isNaN(Number(airRH)) && Number(airRH) < 40) {
-  alerts.push("⚠ Low humidity");
-}
-
-if (vpdKpa !== null && vpdKpa !== undefined && !Number.isNaN(Number(vpdKpa)) && Number(vpdKpa) > 1.5) {
-  alerts.push("⚠ High VPD");
-}
-
-if (ppfd !== null && ppfd !== undefined && !Number.isNaN(Number(ppfd)) && Number(ppfd) > 400) {
-  alerts.push("⚠ High radiation");
-}
-
-if (isRaining === 1 || isRaining === "1" || isRaining === true) {
-  alerts.push("🌧 Rain detected");
-}
-
-if (airT === null || airT === undefined || airRH === null || airRH === undefined || Number.isNaN(Number(airT)) || Number.isNaN(Number(airRH))) {
-  alerts.push("❌ Temperature sensor disconnected");
-}
-
-if (ppfd === null || ppfd === undefined || Number.isNaN(Number(ppfd))) {
-  alerts.push("❌ Light sensor disconnected");
-}
-
-if (pressHpa === null || pressHpa === undefined || Number.isNaN(Number(pressHpa))) {
-  alerts.push("❌ Pressure sensor disconnected");
-}
-
-if (windKmh === null || windKmh === undefined || Number.isNaN(Number(windKmh))) {
-  alerts.push("❌ Wind sensor disconnected");
-}
-
-if (!client.connected) {
-  alerts.push("❌ MQTT disconnected");
-}
-
-if(alerts.length === 0){
-
-setText("alerts","System OK");
-alertCard.classList.remove("alert-active");
-
-}else{
-
-setText("alerts",alerts.join(" | "));
-alertCard.classList.add("alert-active");
-
-}
-}
   // ===== KPIs =====
   setText("airT",  fmt(airT, 1));
   setText("airRH", fmt(airRH, 1));
