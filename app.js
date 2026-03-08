@@ -2,7 +2,7 @@
    Smart Irrigation Dashboard — MQTT + Firebase History
    Live: MQTT
    History: Firebase RTDB
-   + Professional Alerts System
+   + Header Alerts Pill + Sound Alarm
    ========================================================= */
 
 // ===================== MQTT CONFIG =====================
@@ -470,7 +470,7 @@ client.on("message", (topic, message) => {
   }
   setText("rainSub", sub);
 
-  // ===== ALERTS =====
+  // ===== SYSTEM ALERTS PILL =====
   let alerts = [];
   let level = "ok";
 
@@ -581,18 +581,17 @@ client.on("message", (topic, message) => {
 
   if (alerts.length === 0) {
     if (alertCard) alertCard.classList.add("alert-ok");
-    setText("alertState", "OK");
-    setText("alertMsg", "System operating normally");
+    setText("alertState", "System Alerts");
+    setText("alertMsg", "OK");
     previousAlertLevel = "ok";
   } else {
     if (level === "crit") {
       if (alertCard) alertCard.classList.add("alert-crit");
-      setText("alertState", "CRITICAL");
     } else {
       if (alertCard) alertCard.classList.add("alert-warn");
-      setText("alertState", "WARNING");
     }
 
+    setText("alertState", "System Alerts");
     setText("alertMsg", alerts.join(" | "));
 
     if (alarmArmed && alarm && previousAlertLevel !== level) {
