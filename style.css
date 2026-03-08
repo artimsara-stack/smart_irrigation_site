@@ -51,22 +51,25 @@ body{
 
 header{
   display:flex;
-  align-items:center;
+  align-items:flex-start;
   justify-content:space-between;
   gap:14px;
   margin-bottom:18px;
+  flex-wrap:wrap;
 }
 
 .title{
   display:flex;
   align-items:center;
   gap:12px;
+  min-width: 0;
 }
 
 .logo{
   width:44px;height:44px;border-radius:14px;
   background: linear-gradient(135deg, rgba(99,102,241,1), rgba(34,197,94,1));
   box-shadow: 0 10px 30px rgba(99,102,241,.18);
+  flex: 0 0 auto;
 }
 
 h2{
@@ -87,6 +90,8 @@ h2{
   align-items:center;
   gap:10px;
   flex-wrap:wrap;
+  justify-content:flex-end;
+  min-width: 0;
 }
 
 .pill{
@@ -100,12 +105,14 @@ h2{
   box-shadow: 0 10px 28px rgba(0,0,0,.18);
   font-size:12px;
   user-select:none;
+  max-width: 100%;
 }
 
 .dot{
   width:9px;height:9px;border-radius:50%;
   background: var(--warn);
   box-shadow: 0 0 0 3px rgba(245,158,11,.15);
+  flex: 0 0 auto;
 }
 .dot.ok{
   background: var(--good);
@@ -126,6 +133,7 @@ h2{
   font-size:12px;
   font-weight:700;
   transition: transform .08s ease, background .18s ease, border-color .18s ease;
+  max-width: 100%;
 }
 .btn:hover{
   background: rgba(255,255,255,.06);
@@ -140,11 +148,13 @@ h2{
   box-shadow: var(--shadow);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  min-width: 0;
 }
 
 .kpi{
   padding:14px 14px 12px;
   min-height: 92px;
+  min-width: 0;
 }
 
 .label{
@@ -161,6 +171,8 @@ h2{
   font-weight:900;
   letter-spacing:.2px;
   line-height:1.05;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .unit{
@@ -173,6 +185,7 @@ h2{
   margin-top:6px;
   font-size:12px;
   color:var(--muted);
+  word-break: break-word;
 }
 
 .badge{
@@ -186,21 +199,26 @@ h2{
   letter-spacing:.4px;
   border:1px solid var(--border);
   background: rgba(0,0,0,.12);
+  max-width: 100%;
 }
 .badge.on{ color: var(--good); }
 .badge.off{ color: var(--bad); }
 
 .grid{
   display:grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap:12px;
 }
 
+.grid > *{
+  min-width: 0;
+}
+
 @media (max-width: 1150px){
-  .grid{ grid-template-columns: repeat(4, 1fr); }
+  .grid{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 860px){
-  .grid{ grid-template-columns: repeat(2, 1fr); }
+  .grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 520px){
   .grid{ grid-template-columns: 1fr; }
@@ -209,12 +227,13 @@ h2{
 .charts{
   margin-top:14px;
   display:grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap:12px;
 }
 
 .chartCard{
   padding:12px 12px 10px;
+  min-width: 0;
 }
 
 .chartCard .label{
@@ -229,7 +248,7 @@ h2{
 }
 
 @media (max-width: 1150px){
-  .charts{ grid-template-columns: repeat(2, 1fr); }
+  .charts{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 860px){
   .charts{ grid-template-columns: 1fr; }
@@ -267,6 +286,7 @@ h2{
 .history-table tr:hover td{
   background: rgba(255,255,255,.04);
 }
+
 .alert-card{
   transition: border-color .2s ease, box-shadow .2s ease, transform .15s ease;
 }
