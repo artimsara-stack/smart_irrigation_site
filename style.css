@@ -275,6 +275,7 @@ h2{
   white-space:nowrap;
   overflow:hidden;
   color:#fff;
+  cursor:pointer;
 }
 
 .alert-pill #alertState{
