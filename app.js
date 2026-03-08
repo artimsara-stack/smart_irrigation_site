@@ -439,15 +439,17 @@ if (!client.connected) {
   alerts.push("❌ MQTT disconnected");
 }
 
-if (alerts.length === 0) {
-  setText("alerts", "System OK");
-  alarmActive = false;
-} else {
-  setText("alerts", alerts.join(" | "));
-  if (!alarmActive && alarm) {
-    alarm.play().catch(() => {});
-    alarmActive = true;
-  }
+if(alerts.length === 0){
+
+setText("alerts","System OK");
+alertCard.classList.remove("alert-active");
+
+}else{
+
+setText("alerts",alerts.join(" | "));
+alertCard.classList.add("alert-active");
+
+}
 }
   // ===== KPIs =====
   setText("airT",  fmt(airT, 1));
