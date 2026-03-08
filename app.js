@@ -2,6 +2,7 @@
    Smart Irrigation Dashboard — MQTT + Firebase History
    Live: MQTT
    History: Firebase RTDB
+   + Professional Alerts System
    ========================================================= */
 
 // ===================== MQTT CONFIG =====================
@@ -13,6 +14,14 @@ const MQTT_CMD_TOPIC = "smart/irrigation/cmd";
 
 // ===================== DOM HELPERS =====================
 const $ = (id) => document.getElementById(id);
+
+const alertCard  = $("alertsCard");
+const alertState = $("alertState");
+const alertMsg   = $("alertMsg");
+const alarm      = $("alarmSound");
+
+let alarmArmed = false;
+let previousAlertLevel = "ok";
 
 function setText(id, v){
   const n = $(id);
@@ -340,6 +349,15 @@ window.addEventListener("load", () => {
   loadAvailableMonths();
 });
 
+document.addEventListener("click", () => {
+  if (!alarm || alarmArmed) return;
+  alarm.play().then(() => {
+    alarm.pause();
+    alarm.currentTime = 0;
+    alarmArmed = true;
+  }).catch(() => {});
+}, { once: true });
+
 // ===================== MQTT EVENTS =====================
 client.on("connect", () => {
   setOnline(true, "MQTT Connected ✅");
@@ -451,6 +469,139 @@ client.on("message", (topic, message) => {
     sub += ` • Lock: ${(!Number.isNaN(lock) ? lock : "--")} min`;
   }
   setText("rainSub", sub);
+
+  // ===== ALERTS =====
+  let alerts = [];
+  let level = "ok";
+
+  if (
+    vpdKpa !== null && vpdKpa !== undefined &&
+    !Number.isNaN(Number(vpdKpa)) &&
+    Number(vpdKpa) > 1.4 &&
+    et0Rate !== null && et0Rate !== undefined &&
+    !Number.isNaN(Number(et0Rate)) &&
+    Number(et0Rate) > 0.18
+  ){
+    alerts.push("🌱 Hydric stress");
+    level = "warn";
+  }
+
+  if (
+    airT !== null && airT !== undefined &&
+    !Number.isNaN(Number(airT)) &&
+    Number(airT) > 34 &&
+    vpdKpa !== null && vpdKpa !== undefined &&
+    !Number.isNaN(Number(vpdKpa)) &&
+    Number(vpdKpa) > 1.8
+  ){
+    alerts.push("🌡 Heat stress");
+    level = "warn";
+  }
+
+  if (
+    et0Rate !== null && et0Rate !== undefined &&
+    !Number.isNaN(Number(et0Rate)) &&
+    Number(et0Rate) > 0.22
+  ){
+    alerts.push("🌬 Evapotranspiration high");
+    level = "warn";
+  }
+
+  if (
+    ppfd !== null && ppfd !== undefined &&
+    !Number.isNaN(Number(ppfd)) &&
+    Number(ppfd) > 400
+  ){
+    alerts.push("☀️ High radiation");
+    level = "warn";
+  }
+
+  if (
+    rainLockMin !== null && rainLockMin !== undefined &&
+    !Number.isNaN(Number(rainLockMin)) &&
+    Number(rainLockMin) > 0
+  ){
+    alerts.push("🌧 Rain lock active");
+    level = "warn";
+  }
+
+  if (
+    airT === null || airT === undefined ||
+    airRH === null || airRH === undefined ||
+    Number.isNaN(Number(airT)) || Number.isNaN(Number(airRH))
+  ){
+    alerts.push("❌ Temperature sensor disconnected");
+    level = "crit";
+  }
+
+  if (
+    pressHpa === null || pressHpa === undefined ||
+    Number.isNaN(Number(pressHpa))
+  ){
+    alerts.push("❌ Pressure sensor disconnected");
+    level = "crit";
+  }
+
+  if (
+    windKmh === null || windKmh === undefined ||
+    Number.isNaN(Number(windKmh))
+  ){
+    alerts.push("❌ Wind sensor disconnected");
+    level = "crit";
+  }
+
+  if (
+    ppfd === null || ppfd === undefined ||
+    Number.isNaN(Number(ppfd))
+  ){
+    alerts.push("❌ Light sensor disconnected");
+    level = "crit";
+  }
+
+  if (
+    airT !== null && airT !== undefined &&
+    !Number.isNaN(Number(airT)) &&
+    Number(airT) > 38 &&
+    vpdKpa !== null && vpdKpa !== undefined &&
+    !Number.isNaN(Number(vpdKpa)) &&
+    Number(vpdKpa) > 2.2
+  ){
+    alerts.push("🔥 Severe heat stress");
+    level = "crit";
+  }
+
+  if (!client.connected) {
+    alerts.push("❌ MQTT disconnected");
+    level = "crit";
+  }
+
+  if (alertCard) {
+    alertCard.classList.remove("alert-ok", "alert-warn", "alert-crit");
+  }
+
+  if (alerts.length === 0) {
+    if (alertCard) alertCard.classList.add("alert-ok");
+    setText("alertState", "OK");
+    setText("alertMsg", "System operating normally");
+    previousAlertLevel = "ok";
+  } else {
+    if (level === "crit") {
+      if (alertCard) alertCard.classList.add("alert-crit");
+      setText("alertState", "CRITICAL");
+    } else {
+      if (alertCard) alertCard.classList.add("alert-warn");
+      setText("alertState", "WARNING");
+    }
+
+    setText("alertMsg", alerts.join(" | "));
+
+    if (alarmArmed && alarm && previousAlertLevel !== level) {
+      alarm.currentTime = 0;
+      alarm.play().catch(() => {});
+    }
+
+    previousAlertLevel = level;
+  }
 
   // ===== Charts =====
   const tLabel = new Date().toLocaleTimeString();
