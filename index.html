@@ -7,13 +7,9 @@
 
   <link rel="stylesheet" href="style.css">
 
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- MQTT.js -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
-  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
@@ -60,12 +56,17 @@
     </select>
 
     <button class="btn" id="historyBtn" type="button">📅 History</button>
+
+    <div class="pill alert-pill alert-ok" id="alertsCard" title="System alerts">
+      <span id="alertState">System Alerts</span>
+      <span id="alertMsg">OK</span>
+    </div>
+
     <button class="btn" id="themeBtn" type="button">🌓 Theme</button>
     <button class="btn" id="clearBtn" type="button">🧹 Clear</button>
   </div>
 </header>
 
-<!-- HISTORY PANEL -->
 <div class="card" id="historyPanel" style="display:none; padding:14px; margin-bottom:14px;">
   <div class="label" style="margin-bottom:10px;">Historical Data</div>
 
@@ -102,15 +103,7 @@
   </div>
 </div>
 
-<!-- KPIs -->
 <div class="grid">
-  <div class="card kpi alert-card alert-ok" id="alertsCard">
-  <div class="label">System Alerts</div>
-  <div class="value">
-    <span id="alertState">OK</span>
-  </div>
-  <div class="sub" id="alertMsg">System operating normally</div>
-</div>
 
   <div class="card kpi">
     <div class="label">Air Temperature</div>
@@ -178,7 +171,6 @@
 
 </div>
 
-<!-- Charts -->
 <div class="charts">
 
   <div class="card chartCard">
@@ -215,9 +207,10 @@
 
 </div>
 
-  <audio id="alarmSound" preload="auto">
+<audio id="alarmSound" preload="auto">
   <source src="alarm.mp3" type="audio/mpeg">
 </audio>
+
 <script src="app.js"></script>
 </body>
 </html>
