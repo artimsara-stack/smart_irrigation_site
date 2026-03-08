@@ -12,6 +12,10 @@ const MQTT_TOPIC     = "smart/irrigation";
 const MQTT_CMD_TOPIC = "smart/irrigation/cmd";
 
 // ===================== DOM HELPERS =====================
+document.addEventListener("click", () => {
+  const alarm = document.getElementById("alarmSound");
+  if (alarm) alarm.play().then(() => alarm.pause()).catch(()=>{});
+});
 const $ = (id) => document.getElementById(id);
 const alarm = document.getElementById("alarmSound");
 let alarmActive = false;
