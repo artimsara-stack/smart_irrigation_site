@@ -1,17 +1,14 @@
 /* =========================================================
-   Smart Irrigation Dashboard — MQTT + Firebase History
-   Live: MQTT
-   History: Firebase RTDB
+   Smart Irrigation Dashboard — MQTT (EMQX)
+   + Alerts system
    ========================================================= */
 
-// ===================== MQTT CONFIG =====================
-const MQTT_HOST      = "wss://n1122166.ala.eu-central-1.emqxsl.com:8084/mqtt";
-const MQTT_USER      = "sara";
-const MQTT_PASS      = "12345678";
-const MQTT_TOPIC     = "smart/irrigation";
+const MQTT_HOST = "wss://n1122166.ala.eu-central-1.emqxsl.com:8084/mqtt";
+const MQTT_USER = "sara";
+const MQTT_PASS = "12345678";
+const MQTT_TOPIC = "smart/irrigation";
 const MQTT_CMD_TOPIC = "smart/irrigation/cmd";
 
-// ===================== DOM HELPERS =====================
 const $ = (id) => document.getElementById(id);
 
 function setText(id, v){
@@ -38,14 +35,16 @@ function setOnline(ok, msg){
 function setPumpBadge(state){
   const b = $("pumpBadge");
   if (!b) return;
+
   const isOn = String(state || "").toUpperCase() === "ON";
+
   b.textContent = isOn ? "ON" : "OFF";
   b.classList.toggle("on", isOn);
   b.classList.toggle("off", !isOn);
 }
 
-// ===================== SAFE JSON PARSE =====================
 function safeParse(raw){
+
   if (typeof raw !== "string") return null;
 
   const cleaned = raw
@@ -57,15 +56,11 @@ function safeParse(raw){
   try {
     return JSON.parse(cleaned);
   } catch(e){
-    console.log("❌ JSON parse failed");
-    console.log("RAW    =", raw);
-    console.log("CLEANED=", cleaned);
-    console.log(e);
+    console.log("JSON parse error", e);
     return null;
   }
 }
 
-// ===================== CHARTS =====================
 const MAX_POINTS = 40;
 const charts = {};
 
@@ -77,10 +72,12 @@ function addPoint(obj, label, value){
     obj.labels.shift();
     obj.data.shift();
   }
+
   obj.chart.update();
 }
 
 function makeLineChart(canvasId, label){
+
   const canvas = document.getElementById(canvasId);
   if (!canvas || !window.Chart) return null;
 
@@ -96,7 +93,6 @@ function makeLineChart(canvasId, label){
         data,
         tension: 0.25,
         pointRadius: 2,
-        pointHoverRadius: 3,
         borderWidth: 2
       }]
     },
@@ -105,11 +101,10 @@ function makeLineChart(canvasId, label){
       maintainAspectRatio: false,
       animation: false,
       plugins: {
-        legend: { display: true },
-        tooltip: { intersect: false, mode: "index" }
+        legend: { display: true }
       },
       scales: {
-        x: { ticks: { maxTicksLimit: 8 } },
+        x: { ticks: { maxTicksLimit: 8 }},
         y: { beginAtZero: false }
       }
     }
@@ -119,345 +114,174 @@ function makeLineChart(canvasId, label){
 }
 
 function initCharts(){
-  charts.temp  = makeLineChart("cTemp",  "Air Temperature (°C)");
-  charts.soil  = makeLineChart("cSoil",  "Soil (%)");
-  charts.wind  = makeLineChart("cWind",  "Wind (km/h)");
-  charts.press = makeLineChart("cPress", "Pressure (hPa)");
-  charts.edi   = makeLineChart("cEdi",   "ET0 rate (mm/h)");
-  charts.ppfd  = makeLineChart("cPpfd",  "PPFD");
+
+  charts.temp = makeLineChart("cTemp","Air Temperature");
+  charts.soil = makeLineChart("cSoil","Soil");
+  charts.wind = makeLineChart("cWind","Wind");
+  charts.press = makeLineChart("cPress","Pressure");
+  charts.edi = makeLineChart("cEdi","ET0");
+  charts.ppfd = makeLineChart("cPpfd","PPFD");
+
 }
 
-function updateChart(ref, label, v){
+function updateChart(ref,label,v){
   if (!ref) return;
+
   const x = Number(v);
   if (v === null || v === undefined || Number.isNaN(x)) return;
-  addPoint(ref, label, x);
+
+  addPoint(ref,label,x);
 }
 
-function clearCharts(){
-  Object.values(charts).forEach(ref => {
-    if (!ref) return;
-    ref.labels.length = 0;
-    ref.data.length = 0;
-    ref.chart.update();
-  });
-}
-
-// ===================== THEME + CLEAR =====================
-function toggleTheme(){
-  const root = document.documentElement;
-  const cur = root.getAttribute("data-theme");
-  root.setAttribute("data-theme", cur === "light" ? "dark" : "light");
-}
-
-function hookButtons(){
-  const themeBtn = $("themeBtn");
-  const clearBtn = $("clearBtn");
-
-  if (themeBtn) themeBtn.addEventListener("click", toggleTheme);
-
-  if (clearBtn) clearBtn.addEventListener("click", () => {
-    msgCount = 0;
-    clearCharts();
-  });
-}
-
-// ===================== CROP SELECTION =====================
-function hookCropSelect(){
-  const sel = $("cropSelect");
-  if (!sel) return;
-
-  sel.addEventListener("change", () => {
-    const crop = sel.value;
-    if (!client || !client.connected) return;
-
-    const payload = JSON.stringify({ crop });
-    client.publish(MQTT_CMD_TOPIC, payload, { qos: 0, retain: true }, (err) => {
-      if (err) console.log("❌ publish cmd error:", err);
-      else console.log("✅ crop cmd sent:", payload);
-    });
-  });
-}
-
-function syncCropSelectFromESP(cropText){
-  const sel = $("cropSelect");
-  if (!sel) return;
-  const up = String(cropText || "").toUpperCase();
-  if (up.includes("BERR")) sel.value = "BERRIES";
-  else if (up.includes("TOM")) sel.value = "TOMATO";
-}
-
-// ===================== HISTORY =====================
-function hookHistoryBtn(){
-  const btn = $("historyBtn");
-  const panel = $("historyPanel");
-  if (!btn || !panel) return;
-
-  btn.addEventListener("click", () => {
-    panel.style.display = (panel.style.display === "none" || !panel.style.display) ? "block" : "none";
-  });
-}
-
-function showHistoryEmpty(msg = "No historical data for this selection."){
-  setText("historyEmpty", msg);
-  $("historyEmpty").style.display = "block";
-  $("historyTableWrap").style.display = "none";
-}
-
-function showHistoryTable(){
-  $("historyEmpty").style.display = "none";
-  $("historyTableWrap").style.display = "block";
-}
-
-function renderHistoryTable(dayData){
-  const tbody = $("historyTableBody");
-  if (!tbody) return;
-
-  tbody.innerHTML = "";
-
-  const slotOrder = [
-    "slot_00_06",
-    "slot_06_12",
-    "slot_12_18",
-    "slot_18_00"
-  ];
-
-  const slotLabels = {
-    slot_00_06: "00:00 - 06:00",
-    slot_06_12: "06:00 - 12:00",
-    slot_12_18: "12:00 - 18:00",
-    slot_18_00: "18:00 - 00:00"
-  };
-
-  let hasAnyData = false;
-
-  slotOrder.forEach(slot => {
-    const row = dayData?.[slot];
-    if (row) hasAnyData = true;
-
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${slotLabels[slot]}</td>
-      <td>${row ? fmt(row.air_temp, 1) : "--"}</td>
-      <td>${row ? fmt(row.air_rh, 1) : "--"}</td>
-      <td>${row ? fmt(row.ppfd, 1) : "--"}</td>
-      <td>${row ? fmt(row.wind_kmh, 1) : "--"}</td>
-      <td>${row ? fmt(row.pressure_hpa, 1) : "--"}</td>
-      <td>${row ? fmt(row.rain_pct, 0) + "%" : "--"}</td>
-      <td>${row ? fmt(row.pump_pct, 0) + "%" : "--"}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  if (!hasAnyData) {
-    showHistoryEmpty("No historical data for this day.");
-    return;
-  }
-
-  showHistoryTable();
-}
-
-async function loadAvailableMonths(){
-  const sel = $("monthSelect");
-  if (!sel || !window.firebaseDb) return;
-
-  sel.innerHTML = `<option value="">Select month</option>`;
-
-  try {
-    const snap = await window.firebaseGet(window.firebaseRef(window.firebaseDb, "/history"));
-    if (!snap.exists()) return;
-
-    const data = snap.val();
-    Object.keys(data).sort().forEach(monthKey => {
-      const opt = document.createElement("option");
-      opt.value = monthKey;
-      opt.textContent = monthKey;
-      sel.appendChild(opt);
-    });
-  } catch(err) {
-    console.error("Failed to load months", err);
-  }
-}
-
-async function loadHistoryForSelection(){
-  const month = $("monthSelect")?.value;
-  const day = $("dayPicker")?.value;
-
-  if (!month || !day){
-    showHistoryEmpty("Please select a month and a day.");
-    return;
-  }
-
-  try {
-    const path = `/history/${month}/${day}`;
-    const snap = await window.firebaseGet(window.firebaseRef(window.firebaseDb, path));
-
-    if (!snap.exists()) {
-      showHistoryEmpty("No historical data for this day.");
-      return;
-    }
-
-    const dayData = snap.val();
-    renderHistoryTable(dayData);
-  } catch(err){
-    console.error("Unable to load historical data", err);
-    showHistoryEmpty("Unable to load historical data.");
-  }
-}
-
-function hookHistoryControls(){
-  const loadBtn = $("loadHistoryBtn");
-  if (loadBtn) {
-    loadBtn.addEventListener("click", loadHistoryForSelection);
-  }
-}
-
-// ===================== MQTT CONNECT =====================
-setOnline(false, "Connecting...");
+setOnline(false,"Connecting...");
 
 let msgCount = 0;
 
-const client = mqtt.connect(MQTT_HOST, {
-  username: MQTT_USER,
-  password: MQTT_PASS,
-  clientId: "dash_" + Math.random().toString(16).slice(2),
-  clean: true,
-  connectTimeout: 8000,
-  reconnectPeriod: 2500,
+const client = mqtt.connect(MQTT_HOST,{
+  username:MQTT_USER,
+  password:MQTT_PASS,
+  clientId:"dash_"+Math.random().toString(16).slice(2),
+  clean:true,
+  reconnectPeriod:2500
 });
 
-// ===================== BOOT =====================
-window.addEventListener("load", () => {
-  if (!document.documentElement.getAttribute("data-theme")){
-    document.documentElement.setAttribute("data-theme", "dark");
-  }
+window.addEventListener("load",()=>{
 
   initCharts();
-  hookButtons();
-  hookCropSelect();
-  hookHistoryBtn();
-  hookHistoryControls();
-  loadAvailableMonths();
+
 });
 
-// ===================== MQTT EVENTS =====================
-client.on("connect", () => {
-  setOnline(true, "MQTT Connected ✅");
+client.on("connect",()=>{
 
-  client.subscribe(MQTT_TOPIC, { qos: 0 }, (err) => {
-    if (err) setOnline(false, "Subscribe error ❌");
-  });
+  setOnline(true,"MQTT Connected");
 
-  client.subscribe(MQTT_TOPIC + "/#", { qos: 0 }, () => {});
+  client.subscribe(MQTT_TOPIC);
+
 });
 
-client.on("reconnect", () => setOnline(false, "Reconnecting..."));
-client.on("close", () => setOnline(false, "Disconnected"));
-client.on("error", (e) => {
-  console.log("MQTT error:", e);
-  setOnline(false, "MQTT Error");
+client.on("reconnect",()=>setOnline(false,"Reconnecting..."));
+
+client.on("close",()=>setOnline(false,"Disconnected"));
+
+client.on("error",(e)=>{
+
+  console.log(e);
+  setOnline(false,"MQTT Error");
+
 });
 
-// ===================== MESSAGE HANDLER =====================
-client.on("message", (topic, message) => {
+client.on("message",(topic,message)=>{
+
   const raw = message.toString();
+
   const d = safeParse(raw);
   if (!d) return;
 
   msgCount++;
 
-  const crop         = d.crop;
-  const airT         = d.air_temp;
-  const airRH        = d.air_rh;
-  const soilPct      = d.soil_pct;
-  const lux          = d.lux;
-  const ppfd         = d.ppfd;
-  const pressHpa     = d.pressure_hpa;
+  const crop = d.crop;
+  const airT = d.air_temp;
+  const airRH = d.air_rh;
+  const soilPct = d.soil_pct;
 
-  const windKmh      = (d.wind_kmh !== undefined && d.wind_kmh !== null)
-    ? d.wind_kmh
-    : ((d.wind_ms !== undefined && d.wind_ms !== null) ? (Number(d.wind_ms) * 3.6) : null);
+  const lux = d.lux;
+  const ppfd = d.ppfd;
 
-  const vpdKpa       = d.vpd;
-  const et0Rate      = d.et0_rate_mm_h;
-  const et0Daily     = d.et0_daily_est_mm;
+  const pressHpa = d.pressure_hpa;
 
-  const pump         = d.pump ?? "OFF";
-  const isDay        = d.is_day;
-  const pulsesDone   = d.pulses_done;
-  const pulsesTarget = d.pulses_target;
+  const windKmh = d.wind_kmh;
 
-  const isRaining    = d.is_raining;
-  const rainAO       = d.rain_ao;
-  const rainLockMin  = d.rain_lock_min;
-  const rainDurMin   = d.rain_duration_min;
+  const vpdKpa = d.vpd;
+  const et0Rate = d.et0_rate_mm_h;
+  const et0Daily = d.et0_daily_est_mm;
 
-  // ===== KPIs =====
-  setText("airT",  fmt(airT, 1));
-  setText("airRH", fmt(airRH, 1));
+  const pump = d.pump ?? "OFF";
+  const isDay = d.is_day;
 
-  setText("soil", fmt(soilPct, 1));
-  setText("soilUnit", "%");
-  setText("soilSub", "Not controlling");
+  const isRaining = d.is_raining;
 
-  const ppfdNum = Number(ppfd);
-  setText("ppfd", (ppfd === null || ppfd === undefined || Number.isNaN(ppfdNum) || ppfdNum < 0) ? "--" : fmt(ppfdNum, 2));
+  setText("airT",fmt(airT,1));
+  setText("airRH",fmt(airRH,1));
 
-  const luxNum = Number(lux);
-  setText("lux", (lux === null || lux === undefined || Number.isNaN(luxNum) || luxNum < 0) ? "--" : Math.round(luxNum));
+  setText("soil",fmt(soilPct,1));
 
-  setText("wind",  fmt(windKmh, 1));
-  setText("press", fmt(pressHpa, 1));
-  setText("vpd",   fmt(vpdKpa, 2));
+  setText("ppfd",fmt(ppfd,1));
+  setText("lux",Math.round(lux));
 
-  setText("edi", fmt(et0Rate, 3));
-  setText("ediSub", `daily≈ ${fmt(et0Daily, 2)} mm/d`);
+  setText("wind",fmt(windKmh,1));
+  setText("press",fmt(pressHpa,1));
+  setText("vpd",fmt(vpdKpa,2));
 
-  // ===== Pump badge + daily cycles =====
+  setText("edi",fmt(et0Rate,3));
+  setText("ediSub",`daily≈ ${fmt(et0Daily,2)} mm/d`);
+
   setPumpBadge(pump);
 
-  const dayTxt = (isDay === 1 || isDay === "1") ? "DAY ☀️" : "NIGHT 🌙";
+  setText("dayNight",(isDay==1?"DAY ☀️":"NIGHT 🌙"));
 
-  let cyclesTxt = "";
-  const doneOk = pulsesDone !== undefined && pulsesDone !== null && !Number.isNaN(Number(pulsesDone));
-  const targetOk = pulsesTarget !== undefined && pulsesTarget !== null && !Number.isNaN(Number(pulsesTarget));
+  setText("cropLbl",crop||"--");
 
-  if (doneOk && targetOk) {
-    cyclesTxt = ` • Cycles: ${pulsesDone}/${pulsesTarget}`;
-  } else if (doneOk) {
-    cyclesTxt = ` • Cycles: ${pulsesDone}`;
+  setText("timeLbl","Last update: "+new Date().toLocaleTimeString());
+
+  const raining = (isRaining==1);
+
+  setText("rainState",raining?"RAIN":"NO RAIN");
+
+  let alerts = [];
+
+  if(airT !== null && airT > 32){
+    alerts.push("⚠ High temperature");
   }
 
-  setText("dayNight", dayTxt + cyclesTxt);
-
-  // ===== Crop =====
-  if (crop) syncCropSelectFromESP(crop);
-
-  // ===== Last update =====
-  setText("timeLbl", "Last update: " + new Date().toLocaleTimeString());
-
-  // ===== Rain =====
-  const raining = (isRaining === 1 || isRaining === "1" || isRaining === true);
-  setText("rainState", raining ? "RAIN" : "NO RAIN");
-  setText("rainUnit",  raining ? "🌧️" : "☀️");
-
-  let sub = `AO: ${rainAO ?? "--"}`;
-  const dur = Number(rainDurMin);
-  if (raining) {
-    sub += ` • Duration: ${(!Number.isNaN(dur) ? dur : "--")} min`;
-  } else {
-    if (!Number.isNaN(dur) && dur > 0) sub += ` • Last: ${dur} min`;
-    const lock = Number(rainLockMin);
-    sub += ` • Lock: ${(!Number.isNaN(lock) ? lock : "--")} min`;
+  if(airRH !== null && airRH < 40){
+    alerts.push("⚠ Low humidity");
   }
-  setText("rainSub", sub);
 
-  // ===== Charts =====
+  if(vpdKpa !== null && vpdKpa > 1.5){
+    alerts.push("⚠ High VPD");
+  }
+
+  if(ppfd !== null && ppfd > 400){
+    alerts.push("⚠ High radiation");
+  }
+
+  if(raining){
+    alerts.push("🌧 Rain detected");
+  }
+
+  if(airT === null || airRH === null){
+    alerts.push("❌ Temperature sensor disconnected");
+  }
+
+  if(ppfd === null){
+    alerts.push("❌ Light sensor disconnected");
+  }
+
+  if(pressHpa === null){
+    alerts.push("❌ Pressure sensor disconnected");
+  }
+
+  if(windKmh === null){
+    alerts.push("❌ Wind sensor disconnected");
+  }
+
+  if(!client.connected){
+    alerts.push("❌ MQTT disconnected");
+  }
+
+  if(alerts.length === 0){
+    setText("alerts","System OK");
+  }else{
+    setText("alerts",alerts.join(" | "));
+  }
+
   const tLabel = new Date().toLocaleTimeString();
-  updateChart(charts.temp,  tLabel, airT);
-  updateChart(charts.soil,  tLabel, soilPct);
-  updateChart(charts.wind,  tLabel, windKmh);
-  updateChart(charts.press, tLabel, pressHpa);
-  updateChart(charts.edi,   tLabel, et0Rate);
-  updateChart(charts.ppfd,  tLabel, (ppfdNum < 0 ? null : ppfdNum));
+
+  updateChart(charts.temp,tLabel,airT);
+  updateChart(charts.soil,tLabel,soilPct);
+  updateChart(charts.wind,tLabel,windKmh);
+  updateChart(charts.press,tLabel,pressHpa);
+  updateChart(charts.edi,tLabel,et0Rate);
+  updateChart(charts.ppfd,tLabel,ppfd);
+
 });
