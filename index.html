@@ -1,213 +1,196 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Smart Irrigation Dashboard</title>
 
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<title>Smart Irrigation Dashboard</title>
 
-  <!-- MQTT.js -->
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<link rel="stylesheet" href="style.css">
 
-  <!-- Firebase SDK -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_AUTH_DOMAIN",
-      databaseURL: "https://smart-irrigation-site-90e51-default-rtdb.firebaseio.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_STORAGE_BUCKET",
-      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-
-    window.firebaseDb = db;
-    window.firebaseRef = ref;
-    window.firebaseGet = get;
-  </script>
 </head>
 
 <body>
+
 <div class="container">
 
 <header>
-  <div class="title">
-    <div class="logo"></div>
-    <div>
-      <h2>Smart Irrigation</h2>
-    </div>
-  </div>
 
-  <div class="actions">
-    <div class="pill">
-      <span class="dot" id="dot"></span>
-      <span id="statusTxt">Connecting...</span>
-    </div>
+<div class="title">
+<div class="logo"></div>
 
-    <select class="btn" id="cropSelect">
-      <option value="TOMATO">🍅 Tomato</option>
-      <option value="BERRIES">🍓 Red berries</option>
-    </select>
+<div>
+<h2>Smart Irrigation</h2>
+</div>
+</div>
 
-    <button class="btn" id="historyBtn" type="button">📅 History</button>
-    <button class="btn" id="themeBtn" type="button">🌓 Theme</button>
-    <button class="btn" id="clearBtn" type="button">🧹 Clear</button>
-  </div>
+<div class="actions">
+
+<div class="pill">
+<span class="dot" id="dot"></span>
+<span id="statusTxt">Connecting...</span>
+</div>
+
+<select class="btn" id="cropSelect">
+<option value="TOMATO">🍅 Tomato</option>
+<option value="BERRIES">🍓 Red berries</option>
+</select>
+
+<button class="btn" id="themeBtn">🌓 Theme</button>
+
+<button class="btn" id="clearBtn">🧹 Clear</button>
+
+</div>
+
 </header>
 
-<!-- HISTORY PANEL -->
-<div class="card" id="historyPanel" style="display:none; padding:14px; margin-bottom:14px;">
-  <div class="label" style="margin-bottom:10px;">Historical Data</div>
 
-  <div class="actions" style="margin-bottom:12px;">
-    <select class="btn" id="monthSelect">
-      <option value="">Select month</option>
-    </select>
-
-    <input type="date" class="btn" id="dayPicker" />
-
-    <button class="btn" id="loadHistoryBtn" type="button">Load</button>
-  </div>
-
-  <div id="historyEmpty" class="sub" style="display:none;">
-    No historical data for this selection.
-  </div>
-
-  <div id="historyTableWrap" style="display:none; overflow-x:auto;">
-    <table class="history-table">
-      <thead>
-        <tr>
-          <th>Interval</th>
-          <th>Air Temp (°C)</th>
-          <th>Air RH (%)</th>
-          <th>Light (PPFD)</th>
-          <th>Wind (km/h)</th>
-          <th>Pressure (hPa)</th>
-          <th>Rain (%)</th>
-          <th>Pump (%)</th>
-        </tr>
-      </thead>
-      <tbody id="historyTableBody"></tbody>
-    </table>
-  </div>
-</div>
-
-<!-- KPIs -->
 <div class="grid">
 
-  <div class="card kpi">
-    <div class="label">Air Temperature</div>
-    <div class="value"><span id="airT">--</span> <span class="unit">°C</span></div>
-    <div class="sub" id="timeLbl">Last update: --</div>
-  </div>
+<div class="card kpi">
+<div class="label">Air Temperature</div>
+<div class="value"><span id="airT">--</span> <span class="unit">°C</span></div>
+<div class="sub" id="timeLbl">Last update: --</div>
+</div>
 
-  <div class="card kpi">
-    <div class="label">Air Humidity</div>
-    <div class="value"><span id="airRH">--</span> <span class="unit">%</span></div>
-    <div class="sub">DHT22</div>
-  </div>
 
-  <div class="card kpi">
-    <div class="label">Soil (monitor)</div>
-    <div class="value"><span id="soil">--</span> <span class="unit" id="soilUnit">%</span></div>
-    <div class="sub" id="soilSub">--</div>
-  </div>
+<div class="card kpi">
+<div class="label">Air Humidity</div>
+<div class="value"><span id="airRH">--</span> <span class="unit">%</span></div>
+<div class="sub">DHT22</div>
+</div>
 
-  <div class="card kpi">
-    <div class="label">Light</div>
-    <div class="value"><span id="ppfd">--</span> <span class="unit">PPFD</span></div>
-    <div class="sub"><span id="lux">--</span> lux</div>
-  </div>
 
-  <div class="card kpi">
-    <div class="label">Wind Speed</div>
-    <div class="value"><span id="wind">--</span> <span class="unit">km/h</span></div>
-    <div class="sub">Anemometer</div>
-  </div>
+<div class="card kpi">
+<div class="label">Soil (monitor)</div>
+<div class="value"><span id="soil">--</span> <span class="unit">%</span></div>
+<div class="sub">Not controlling</div>
+</div>
 
-  <div class="card kpi">
-    <div class="label">Pressure</div>
-    <div class="value"><span id="press">--</span> <span class="unit">hPa</span></div>
-    <div class="sub">BMP280</div>
-  </div>
 
-  <div class="card kpi">
-    <div class="label">VPD</div>
-    <div class="value"><span id="vpd">--</span> <span class="unit">kPa</span></div>
-    <div class="sub">Derived</div>
-  </div>
+<div class="card kpi">
+<div class="label">Light</div>
+<div class="value"><span id="ppfd">--</span> <span class="unit">PPFD</span></div>
+<div class="sub"><span id="lux">--</span> lux</div>
+</div>
 
-  <div class="card kpi">
-    <div class="label">ET0 (rate)</div>
-    <div class="value"><span id="edi">--</span> <span class="unit">mm/h</span></div>
-    <div class="sub" id="ediSub">--</div>
-  </div>
 
-  <div class="card kpi">
-    <div class="label">Pump</div>
-    <div class="value">
-      <span id="pumpBadge" class="badge off">OFF</span>
-    </div>
-    <div class="sub" id="dayNight">--</div>
-  </div>
+<div class="card kpi">
+<div class="label">Wind Speed</div>
+<div class="value"><span id="wind">--</span> <span class="unit">km/h</span></div>
+<div class="sub">Anemometer</div>
+</div>
 
-  <div class="card kpi">
-    <div class="label">Rain</div>
-    <div class="value">
-      <span id="rainState">--</span> <span class="unit" id="rainUnit">--</span>
-    </div>
-    <div class="sub" id="rainSub">--</div>
-  </div>
+
+<div class="card kpi">
+<div class="label">Pressure</div>
+<div class="value"><span id="press">--</span> <span class="unit">hPa</span></div>
+<div class="sub">BMP280</div>
+</div>
+
+
+<div class="card kpi">
+<div class="label">VPD</div>
+<div class="value"><span id="vpd">--</span> <span class="unit">kPa</span></div>
+<div class="sub">Derived</div>
+</div>
+
+
+<div class="card kpi">
+<div class="label">ET0 (rate)</div>
+<div class="value"><span id="edi">--</span> <span class="unit">mm/h</span></div>
+<div class="sub" id="ediSub">--</div>
+</div>
+
+
+<div class="card kpi">
+<div class="label">Pump</div>
+
+<div class="value">
+<span id="pumpBadge" class="badge off">OFF</span>
+</div>
+
+<div class="sub" id="dayNight">--</div>
+</div>
+
+
+<div class="card kpi">
+<div class="label">Rain</div>
+
+<div class="value">
+<span id="rainState">--</span> <span class="unit" id="rainUnit">--</span>
+</div>
+
+<div class="sub" id="rainSub">--</div>
 
 </div>
 
-<!-- Charts -->
+
+<div class="card kpi">
+<div class="label">Alerts</div>
+
+<div class="value">
+<span id="alerts">System OK</span>
+</div>
+
+<div class="sub">System monitoring</div>
+
+</div>
+
+
+</div>
+
+
+
 <div class="charts">
 
-  <div class="card chartCard">
-    <div class="label">Air Temperature (°C)</div>
-    <canvas id="cTemp"></canvas>
-  </div>
+<div class="card chartCard">
+<div class="label">Air Temperature (°C)</div>
+<canvas id="cTemp"></canvas>
+</div>
 
-  <div class="card chartCard">
-    <div class="label">Soil (%)</div>
-    <canvas id="cSoil"></canvas>
-  </div>
 
-  <div class="card chartCard">
-    <div class="label">Wind (km/h)</div>
-    <canvas id="cWind"></canvas>
-  </div>
+<div class="card chartCard">
+<div class="label">Soil (%)</div>
+<canvas id="cSoil"></canvas>
+</div>
 
-  <div class="card chartCard">
-    <div class="label">Pressure (hPa)</div>
-    <canvas id="cPress"></canvas>
-  </div>
 
-  <div class="card chartCard">
-    <div class="label">ET0 rate (mm/h)</div>
-    <canvas id="cEdi"></canvas>
-  </div>
+<div class="card chartCard">
+<div class="label">Wind (km/h)</div>
+<canvas id="cWind"></canvas>
+</div>
 
-  <div class="card chartCard">
-    <div class="label">PPFD</div>
-    <canvas id="cPpfd"></canvas>
-  </div>
+
+<div class="card chartCard">
+<div class="label">Pressure (hPa)</div>
+<canvas id="cPress"></canvas>
+</div>
+
+
+<div class="card chartCard">
+<div class="label">ET0 rate (mm/h)</div>
+<canvas id="cEdi"></canvas>
+</div>
+
+
+<div class="card chartCard">
+<div class="label">PPFD</div>
+<canvas id="cPpfd"></canvas>
+</div>
+
 
 </div>
+
 
 </div>
 
 <script src="app.js"></script>
+
 </body>
 </html>
