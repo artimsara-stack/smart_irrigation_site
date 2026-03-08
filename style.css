@@ -274,6 +274,7 @@ h2{
   gap:8px;
   white-space:nowrap;
   overflow:hidden;
+  color:#fff;
 }
 
 .alert-pill #alertState{
@@ -289,23 +290,32 @@ h2{
 }
 
 .alert-ok{
-  border-color: rgba(34,197,94,.35);
-  box-shadow: 0 10px 28px rgba(0,0,0,.18), 0 0 0 1px rgba(34,197,94,.10) inset;
+  background: rgba(34,197,94,.22);
+  border-color: rgba(34,197,94,.45);
+  box-shadow: 0 10px 28px rgba(0,0,0,.18);
 }
 
 .alert-warn{
-  border-color: rgba(245,158,11,.45);
-  box-shadow: 0 10px 28px rgba(0,0,0,.18), 0 0 0 1px rgba(245,158,11,.12) inset;
+  background: rgba(245,158,11,.24);
+  border-color: rgba(245,158,11,.50);
+  box-shadow: 0 10px 28px rgba(0,0,0,.18);
 }
 
 .alert-crit{
-  border-color: rgba(239,68,68,.50);
-  box-shadow: 0 10px 28px rgba(0,0,0,.18), 0 0 0 1px rgba(239,68,68,.12) inset;
+  background: rgba(239,68,68,.24);
+  border-color: rgba(239,68,68,.55);
+  box-shadow: 0 10px 28px rgba(0,0,0,.18);
   animation: alertBlink 1.15s infinite;
 }
 
 @keyframes alertBlink{
-  0%{ box-shadow: 0 10px 28px rgba(0,0,0,.18), 0 0 0 1px rgba(239,68,68,.12) inset; }
-  50%{ box-shadow: 0 10px 28px rgba(0,0,0,.18), 0 0 14px rgba(239,68,68,.35), 0 0 0 1px rgba(239,68,68,.18) inset; }
-  100%{ box-shadow: 0 10px 28px rgba(0,0,0,.18), 0 0 0 1px rgba(239,68,68,.12) inset; }
+  0%{
+    box-shadow: 0 10px 28px rgba(0,0,0,.18);
+  }
+  50%{
+    box-shadow: 0 10px 28px rgba(0,0,0,.18), 0 0 16px rgba(239,68,68,.35);
+  }
+  100%{
+    box-shadow: 0 10px 28px rgba(0,0,0,.18);
+  }
 }
