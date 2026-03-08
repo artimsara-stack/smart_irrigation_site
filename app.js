@@ -12,6 +12,9 @@ const MQTT_TOPIC     = "smart/irrigation";
 const MQTT_CMD_TOPIC = "smart/irrigation/cmd";
 
 // ===================== DOM HELPERS =====================
+const alertCard = $("alertsCard");
+const alertState = $("alertState");
+const alertMsg = $("alertMsg");
 const $ = (id) => document.getElementById(id);
 
 function setText(id, v){
@@ -451,6 +454,65 @@ client.on("message", (topic, message) => {
     sub += ` • Lock: ${(!Number.isNaN(lock) ? lock : "--")} min`;
   }
   setText("rainSub", sub);
+   let alerts = [];
+let level = "ok";
+
+/* WARNING conditions */
+
+if(vpdKpa !== null && vpdKpa > 1.6){
+  alerts.push("High VPD (plant stress)");
+  level = "warn";
+}
+
+if(airT !== null && airT > 32){
+  alerts.push("High temperature");
+  level = "warn";
+}
+
+if(ppfd !== null && ppfd > 400){
+  alerts.push("Very strong radiation");
+  level = "warn";
+}
+
+/* CRITICAL conditions */
+
+if(airT === null || airRH === null){
+  alerts.push("Temperature sensor disconnected");
+  level = "crit";
+}
+
+if(pressHpa === null){
+  alerts.push("Pressure sensor disconnected");
+  level = "crit";
+}
+
+if(!client.connected){
+  alerts.push("MQTT connection lost");
+  level = "crit";
+}
+
+/* DISPLAY */
+
+alertCard.classList.remove("alert-ok","alert-warn","alert-crit");
+
+if(alerts.length === 0){
+
+  alertCard.classList.add("alert-ok");
+  alertState.textContent = "OK";
+  alertMsg.textContent = "System operating normally";
+
+}else{
+
+  alertState.textContent = level === "crit" ? "CRITICAL" : "WARNING";
+  alertMsg.textContent = alerts.join(" | ");
+
+  if(level === "crit"){
+    alertCard.classList.add("alert-crit");
+  }else{
+    alertCard.classList.add("alert-warn");
+  }
+
+}
 
   // ===== Charts =====
   const tLabel = new Date().toLocaleTimeString();
