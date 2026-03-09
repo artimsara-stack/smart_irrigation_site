@@ -18,7 +18,7 @@ const $ = (id) => document.getElementById(id);
 const alertCard  = $("alertsCard");
 const alertState = $("alertState");
 const alertMsg   = $("alertMsg");
-const alarm      = $("alarmSound");
+let alarm = null;
 
 let alarmArmed = false;
 let previousAlertLevel = "ok";
@@ -382,14 +382,8 @@ if (alertCard) {
     renderAlertsPill();
   });
 }
-
 document.addEventListener("click", () => {
-  if (!alarm || alarmArmed) return;
-  alarm.play().then(() => {
-    alarm.pause();
-    alarm.currentTime = 0;
-    alarmArmed = true;
-  }).catch(() => {});
+  alarmArmed = true;
 }, { once: true });
 
 // ===================== MQTT EVENTS =====================
@@ -611,9 +605,10 @@ client.on("message", (topic, message) => {
   if (alerts.length === 0) {
     previousAlertLevel = "ok";
   } else {
-    if (alarmArmed && alarm && previousAlertLevel !== level) {
-      alarm.currentTime = 0;
-      alarm.play().catch(() => {});
+    if (alarmArmed && previousAlertLevel !== level) {
+  alarm = new Audio("alarm.mp3");
+  alarm.play().catch(() => {});
+}
     }
     previousAlertLevel = level;
   }
