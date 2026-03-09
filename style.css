@@ -228,14 +228,6 @@ h2{
   display:block;
 }
 
-@media (max-width: 1150px){
-  .charts{ grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 860px){
-  .charts{ grid-template-columns: 1fr; }
-  .chartCard canvas{ height:260px !important; }
-}
-
 .history-table{
   width:100%;
   border-collapse: collapse;
@@ -267,43 +259,41 @@ h2{
   background: rgba(255,255,255,.04);
 }
 
+/* ALERT SYSTEM */
+
 .alert-pill{
   display:flex;
   align-items:center;
   gap:8px;
+  white-space:nowrap;
+  color:#fff;
   cursor:pointer;
-  transition: background .2s ease, border-color .2s ease, box-shadow .2s ease;
 }
 
 .alert-pill #alertState{
   font-weight:800;
-  flex:0 0 auto;
 }
 
 .alert-pill #alertMsg{
-  display:inline-block;
-  max-width:180px;
-  overflow:hidden;
-  text-overflow:ellipsis;
   white-space:nowrap;
 }
 
 .alert-ok{
   background: rgba(34,197,94,.22);
   border-color: rgba(34,197,94,.45);
-  color: #eafff1;
+  box-shadow: 0 10px 28px rgba(0,0,0,.18);
 }
 
 .alert-warn{
   background: rgba(245,158,11,.24);
   border-color: rgba(245,158,11,.50);
-  color: #fff5df;
+  box-shadow: 0 10px 28px rgba(0,0,0,.18);
 }
 
 .alert-crit{
   background: rgba(239,68,68,.24);
   border-color: rgba(239,68,68,.55);
-  color: #fff1f1;
+  box-shadow: 0 10px 28px rgba(0,0,0,.18);
   animation: alertBlink 1.15s infinite;
 }
 
