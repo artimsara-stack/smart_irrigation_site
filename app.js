@@ -22,6 +22,7 @@ const alarm      = $("alarmSound");
 
 let alarmArmed = false;
 let previousAlertLevel = "ok";
+let alertsExpanded = false;
 
 function setText(id, v){
   const n = $(id);
@@ -349,6 +350,12 @@ window.addEventListener("load", () => {
   loadAvailableMonths();
 });
 
+if (alertCard) {
+  alertCard.addEventListener("click", () => {
+    alertsExpanded = !alertsExpanded;
+  });
+}
+
 document.addEventListener("click", () => {
   if (!alarm || alarmArmed) return;
   alarm.play().then(() => {
@@ -581,18 +588,19 @@ client.on("message", (topic, message) => {
 
   if (alerts.length === 0) {
     if (alertCard) alertCard.classList.add("alert-ok");
-    setText("alertState", "System Alerts");
-    setText("alertMsg", "OK");
+    setText("alertState", "OK");
+    setText("alertMsg", alertsExpanded ? "System operating normally" : "");
     previousAlertLevel = "ok";
   } else {
     if (level === "crit") {
       if (alertCard) alertCard.classList.add("alert-crit");
+      setText("alertState", "CRITICAL");
     } else {
       if (alertCard) alertCard.classList.add("alert-warn");
+      setText("alertState", "WARNING");
     }
 
-    setText("alertState", "System Alerts");
-    setText("alertMsg", alerts.join(" | "));
+    setText("alertMsg", alertsExpanded ? alerts.join(" | ") : "");
 
     if (alarmArmed && alarm && previousAlertLevel !== level) {
       alarm.currentTime = 0;
