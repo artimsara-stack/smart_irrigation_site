@@ -57,26 +57,26 @@ function setPumpBadge(state){
 }
 
 function renderAlertsPill(){
-  if (alertCard) {
-    alertCard.classList.remove("alert-ok", "alert-warn", "alert-crit");
-  }
+  if (!alertCard || !alertState || !alertMsg) return;
+
+  alertCard.classList.remove("alert-ok", "alert-warn", "alert-crit");
 
   if (!currentAlerts.length) {
-    if (alertCard) alertCard.classList.add("alert-ok");
-    setText("alertState", "OK");
-    setText("alertMsg", alertsExpanded ? "System operating normally" : "");
+    alertCard.classList.add("alert-ok");
+    alertState.textContent = "OK";
+    alertMsg.textContent = alertsExpanded ? "System operating normally" : "";
     return;
   }
 
   if (currentAlertLevel === "crit") {
-    if (alertCard) alertCard.classList.add("alert-crit");
-    setText("alertState", "CRITICAL");
+    alertCard.classList.add("alert-crit");
+    alertState.textContent = "CRITICAL";
   } else {
-    if (alertCard) alertCard.classList.add("alert-warn");
-    setText("alertState", "WARNING");
+    alertCard.classList.add("alert-warn");
+    alertState.textContent = "WARNING";
   }
 
-  setText("alertMsg", alertsExpanded ? currentAlerts.join(" | ") : "");
+  alertMsg.textContent = alertsExpanded ? currentAlerts.join(" | ") : "";
 }
 
 // ===================== SAFE JSON PARSE =====================
@@ -376,7 +376,8 @@ window.addEventListener("load", () => {
 });
 
 if (alertCard) {
-  alertCard.addEventListener("click", () => {
+  alertCard.addEventListener("click", (e) => {
+    e.stopPropagation();
     alertsExpanded = !alertsExpanded;
     renderAlertsPill();
   });
