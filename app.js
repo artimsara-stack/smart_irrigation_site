@@ -2,7 +2,7 @@
    Smart Irrigation Dashboard — MQTT + Firebase History
    Live: MQTT
    History: Firebase RTDB
-   + Professional Alerts System
+   + Header Alerts Pill + Sound Alarm
    ========================================================= */
 
 // ===================== MQTT CONFIG =====================
@@ -22,6 +22,9 @@ const alarm      = $("alarmSound");
 
 let alarmArmed = false;
 let previousAlertLevel = "ok";
+let alertsExpanded = false;
+let currentAlerts = [];
+let currentAlertLevel = "ok";
 
 function setText(id, v){
   const n = $(id);
@@ -51,6 +54,29 @@ function setPumpBadge(state){
   b.textContent = isOn ? "ON" : "OFF";
   b.classList.toggle("on", isOn);
   b.classList.toggle("off", !isOn);
+}
+
+function renderAlertsPill(){
+  if (alertCard) {
+    alertCard.classList.remove("alert-ok", "alert-warn", "alert-crit");
+  }
+
+  if (!currentAlerts.length) {
+    if (alertCard) alertCard.classList.add("alert-ok");
+    setText("alertState", "OK");
+    setText("alertMsg", alertsExpanded ? "System operating normally" : "");
+    return;
+  }
+
+  if (currentAlertLevel === "crit") {
+    if (alertCard) alertCard.classList.add("alert-crit");
+    setText("alertState", "CRITICAL");
+  } else {
+    if (alertCard) alertCard.classList.add("alert-warn");
+    setText("alertState", "WARNING");
+  }
+
+  setText("alertMsg", alertsExpanded ? currentAlerts.join(" | ") : "");
 }
 
 // ===================== SAFE JSON PARSE =====================
@@ -349,6 +375,13 @@ window.addEventListener("load", () => {
   loadAvailableMonths();
 });
 
+if (alertCard) {
+  alertCard.addEventListener("click", () => {
+    alertsExpanded = !alertsExpanded;
+    renderAlertsPill();
+  });
+}
+
 document.addEventListener("click", () => {
   if (!alarm || alarmArmed) return;
   alarm.play().then(() => {
@@ -410,7 +443,6 @@ client.on("message", (topic, message) => {
   const rainLockMin  = d.rain_lock_min;
   const rainDurMin   = d.rain_duration_min;
 
-  // ===== KPIs =====
   setText("airT",  fmt(airT, 1));
   setText("airRH", fmt(airRH, 1));
 
@@ -431,7 +463,6 @@ client.on("message", (topic, message) => {
   setText("edi", fmt(et0Rate, 3));
   setText("ediSub", `daily≈ ${fmt(et0Daily, 2)} mm/d`);
 
-  // ===== Pump badge + daily cycles =====
   setPumpBadge(pump);
 
   const dayTxt = (isDay === 1 || isDay === "1") ? "DAY ☀️" : "NIGHT 🌙";
@@ -448,13 +479,10 @@ client.on("message", (topic, message) => {
 
   setText("dayNight", dayTxt + cyclesTxt);
 
-  // ===== Crop =====
   if (crop) syncCropSelectFromESP(crop);
 
-  // ===== Last update =====
   setText("timeLbl", "Last update: " + new Date().toLocaleTimeString());
 
-  // ===== Rain =====
   const raining = (isRaining === 1 || isRaining === "1" || isRaining === true);
   setText("rainState", raining ? "RAIN" : "NO RAIN");
   setText("rainUnit",  raining ? "🌧️" : "☀️");
@@ -470,7 +498,6 @@ client.on("message", (topic, message) => {
   }
   setText("rainSub", sub);
 
-  // ===== ALERTS =====
   let alerts = [];
   let level = "ok";
 
@@ -575,35 +602,21 @@ client.on("message", (topic, message) => {
     level = "crit";
   }
 
-  if (alertCard) {
-    alertCard.classList.remove("alert-ok", "alert-warn", "alert-crit");
-  }
+  currentAlerts = alerts;
+  currentAlertLevel = level;
+
+  renderAlertsPill();
 
   if (alerts.length === 0) {
-    if (alertCard) alertCard.classList.add("alert-ok");
-    setText("alertState", "OK");
-    setText("alertMsg", "System operating normally");
     previousAlertLevel = "ok";
   } else {
-    if (level === "crit") {
-      if (alertCard) alertCard.classList.add("alert-crit");
-      setText("alertState", "CRITICAL");
-    } else {
-      if (alertCard) alertCard.classList.add("alert-warn");
-      setText("alertState", "WARNING");
-    }
-
-    setText("alertMsg", alerts.join(" | "));
-
     if (alarmArmed && alarm && previousAlertLevel !== level) {
       alarm.currentTime = 0;
       alarm.play().catch(() => {});
     }
-
     previousAlertLevel = level;
   }
 
-  // ===== Charts =====
   const tLabel = new Date().toLocaleTimeString();
   updateChart(charts.temp,  tLabel, airT);
   updateChart(charts.soil,  tLabel, soilPct);
