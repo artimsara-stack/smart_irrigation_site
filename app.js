@@ -16,6 +16,11 @@ const MQTT_CMD_TOPIC = "smart/irrigation/cmd";
 const $ = (id) => document.getElementById(id);
 
 const alertCard  = $("alertsCard");
+if (alertCard) {
+  alertCard.addEventListener("click", () => {
+    alertsExpanded = !alertsExpanded;
+  });
+}
 const alertState = $("alertState");
 const alertMsg   = $("alertMsg");
 const alarm      = $("alarmSound");
