@@ -228,6 +228,14 @@ h2{
   display:block;
 }
 
+@media (max-width: 1150px){
+  .charts{ grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 860px){
+  .charts{ grid-template-columns: 1fr; }
+  .chartCard canvas{ height:260px !important; }
+}
+
 .history-table{
   width:100%;
   border-collapse: collapse;
@@ -259,23 +267,27 @@ h2{
   background: rgba(255,255,255,.04);
 }
 
-/* ALERT SYSTEM */
-
 .alert-pill{
+  max-width: 320px;
   display:flex;
   align-items:center;
   gap:8px;
   white-space:nowrap;
+  overflow:hidden;
   color:#fff;
   cursor:pointer;
 }
 
 .alert-pill #alertState{
   font-weight:800;
+  flex:0 0 auto;
 }
 
 .alert-pill #alertMsg{
+  overflow:hidden;
+  text-overflow:ellipsis;
   white-space:nowrap;
+  max-width:180px;
 }
 
 .alert-ok{
