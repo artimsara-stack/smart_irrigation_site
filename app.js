@@ -14,7 +14,21 @@ const MQTT_CMD_TOPIC = "smart/irrigation/cmd";
 
 // ===================== DOM HELPERS =====================
 const $ = (id) => document.getElementById(id);
+let soundEnabled = false;
 
+const enableSoundBtn = document.getElementById("enableSoundBtn");
+
+enableSoundBtn.addEventListener("click", () => {
+
+  soundEnabled = true;
+
+  const testSound = new Audio("alarm.mp3");
+  testSound.play().then(() => {
+    testSound.pause();
+    testSound.currentTime = 0;
+  }).catch(() => {});
+
+});
 const alertCard  = $("alertsCard");
 const alertState = $("alertState");
 const alertMsg   = $("alertMsg");
@@ -611,10 +625,10 @@ client.on("message", (topic, message) => {
   if (alerts.length === 0) {
     previousAlertLevel = "ok";
   } else {
-    if (alarmArmed && alarm && previousAlertLevel !== level) {
-      alarm.currentTime = 0;
-      alarm.play().catch(() => {});
-    }
+   if (soundEnabled && previousAlertLevel !== level) {
+  const alarm = new Audio("alarm.mp3");
+  alarm.play().catch(()=>{});
+}
     previousAlertLevel = level;
   }
 
