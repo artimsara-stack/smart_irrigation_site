@@ -386,13 +386,8 @@ if (alertCard) {
 document.addEventListener("click", () => {
   if (!alarm || alarmArmed) return;
 
-  alarm.muted = true;
-  alarm.play().then(() => {
-    alarm.pause();
-    alarm.currentTime = 0;
-    alarm.muted = false;
-    alarmArmed = true;
-  }).catch(() => {});
+ document.addEventListener("click", () => {
+  alarmArmed = true;
 }, { once: true });
 
 // ===================== MQTT EVENTS =====================
