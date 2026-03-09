@@ -64,7 +64,23 @@ function renderAlertsPill(){
   if (!currentAlerts.length) {
     alertCard.classList.add("alert-ok");
     alertState.textContent = "OK";
-    alertMsg.textContent = alertsExpanded ? "System operating normally" : "";
+
+    if (alertsExpanded) {
+      alertMsg.textContent = "System operating normally";
+      alertMsg.style.overflow = "visible";
+      alertMsg.style.textOverflow = "clip";
+      alertMsg.style.whiteSpace = "nowrap";
+      alertMsg.style.maxWidth = "none";
+      alertCard.style.maxWidth = "none";
+    } else {
+      alertMsg.textContent = "";
+      alertMsg.style.overflow = "";
+      alertMsg.style.textOverflow = "";
+      alertMsg.style.whiteSpace = "";
+      alertMsg.style.maxWidth = "";
+      alertCard.style.maxWidth = "";
+    }
+
     return;
   }
 
@@ -76,7 +92,26 @@ function renderAlertsPill(){
     alertState.textContent = "WARNING";
   }
 
-  alertMsg.textContent = alertsExpanded ? currentAlerts.join(" | ") : "";
+  if (alertsExpanded) {
+    const fullMsg = currentAlerts.join(" | ");
+    alertMsg.textContent = fullMsg;
+    alertMsg.title = fullMsg;
+
+    alertMsg.style.overflow = "visible";
+    alertMsg.style.textOverflow = "clip";
+    alertMsg.style.whiteSpace = "nowrap";
+    alertMsg.style.maxWidth = "none";
+    alertCard.style.maxWidth = "none";
+  } else {
+    alertMsg.textContent = "";
+    alertMsg.title = "";
+
+    alertMsg.style.overflow = "";
+    alertMsg.style.textOverflow = "";
+    alertMsg.style.whiteSpace = "";
+    alertMsg.style.maxWidth = "";
+    alertCard.style.maxWidth = "";
+  }
 }
 
 // ===================== SAFE JSON PARSE =====================
