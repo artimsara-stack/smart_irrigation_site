@@ -268,14 +268,11 @@ h2{
 }
 
 .alert-pill{
-  max-width: 320px;
   display:flex;
   align-items:center;
   gap:8px;
-  white-space:nowrap;
-  overflow:hidden;
-  color:#fff;
   cursor:pointer;
+  transition: background .2s ease, border-color .2s ease, box-shadow .2s ease;
 }
 
 .alert-pill #alertState{
@@ -284,28 +281,29 @@ h2{
 }
 
 .alert-pill #alertMsg{
+  display:inline-block;
+  max-width:180px;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
-  max-width:180px;
 }
 
 .alert-ok{
   background: rgba(34,197,94,.22);
   border-color: rgba(34,197,94,.45);
-  box-shadow: 0 10px 28px rgba(0,0,0,.18);
+  color: #eafff1;
 }
 
 .alert-warn{
   background: rgba(245,158,11,.24);
   border-color: rgba(245,158,11,.50);
-  box-shadow: 0 10px 28px rgba(0,0,0,.18);
+  color: #fff5df;
 }
 
 .alert-crit{
   background: rgba(239,68,68,.24);
   border-color: rgba(239,68,68,.55);
-  box-shadow: 0 10px 28px rgba(0,0,0,.18);
+  color: #fff1f1;
   animation: alertBlink 1.15s infinite;
 }
 
